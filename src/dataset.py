@@ -29,6 +29,7 @@ class LFDataset(Dataset):
         
         self.findallimg(self.root_path) # save paths of all images, masks to self.images, self.masks
 
+        print ("Load data complete")
         self.counts = self.__compute_class_probability()
 
     def __len__(self):
@@ -107,7 +108,12 @@ class LFDataset(Dataset):
         return 0
     def load_image(self, path=None):
         raw_image = Image.open(path)
-        raw_image = np.transpose(raw_image, (2,0,1))
+        try:
+            raw_image = np.transpose(raw_image, (2,0,1))
+        except:
+            os.remove(path)
+            self.combine_img(path)
+            print (path)
         imx_t = np.array(raw_image, dtype=np.float32)/255.0
 
         return imx_t
@@ -118,8 +124,8 @@ class LFDataset(Dataset):
         # raw_image = raw_image.resize((224, 224))
         imx_t = np.array(raw_image)
         # border
-        imx_t[imx_t==255] = 1
-
+        imx_t[imx_t == 255] = 1
+        imx_t[imx_t < 255] = 0
         return imx_t
 
 class PascalLFDataset(Dataset):

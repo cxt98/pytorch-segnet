@@ -26,17 +26,16 @@ import os
 import time
 import torch
 from torch.utils.data import DataLoader
-
+import torch.nn.parallel
 
 # Constants
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES
 
-NUM_EPOCHS = 6000
+NUM_EPOCHS = 60
 
-LEARNING_RATE = 1e-6
-MOMENTUM = 0.9
-BATCH_SIZE = 2
+LEARNING_RATE = 1e-4
+BATCH_SIZE = 16
 
 
 # Arguments
@@ -59,18 +58,18 @@ def train():
     prev_loss = float('inf')
 
     model.train()
-
+    print ("Batch Number:" + str(len(train_dataloader)))
     for epoch in range(NUM_EPOCHS):
         loss_f = 0
         t_start = time.time()
-
+        batch_id = 0
         for batch in train_dataloader:
             input_tensor = torch.autograd.Variable(batch['image'])
             target_tensor = torch.autograd.Variable(batch['mask'])
 
             if CUDA:
-                input_tensor = input_tensor.cuda(GPU_ID)
-                target_tensor = target_tensor.cuda(GPU_ID)
+                input_tensor = input_tensor.cuda()
+                target_tensor = target_tensor.cuda()
 
             predicted_tensor, softmaxed_tensor = model(input_tensor)
 
@@ -80,17 +79,21 @@ def train():
             loss.backward()
             optimizer.step()
 
-
+            if batch_id % 20 == 0:
+                print("Epoch #{}\tBatch #{}\tLoss: {:.8f}".format(epoch + 1, batch_id, loss))
             loss_f += loss.float()
             prediction_f = softmaxed_tensor.float()
+            batch_id = batch_id + 1
 
+        loss_f = loss_f / len(train_dataloader)
         delta = time.time() - t_start
         is_better = loss_f < prev_loss
 
         if is_better:
             prev_loss = loss_f
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best.pth"))
-
+        if epoch % 20 == 0:
+            torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
         print("Epoch #{}\tLoss: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, delta))
 
 
@@ -98,7 +101,7 @@ if __name__ == "__main__":
     data_root = args.data_root
 
     CUDA = 1 # args.gpu is not None
-    GPU_ID = 0
+    GPU_ID = [0,1]
 
 
     train_dataset = LFDataset(root_path=data_root)
@@ -106,15 +109,16 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=BATCH_SIZE,
                                   shuffle=True,
-                                  num_workers=4)
+                                  num_workers=6)
+
 
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
-                       output_channels=NUM_OUTPUT_CHANNELS).cuda(GPU_ID)
-
+                       output_channels=NUM_OUTPUT_CHANNELS).cuda()
+        model = torch.nn.DataParallel(model, GPU_ID).cuda()
         # class_weights = 1.0/train_dataset.get_class_probability().cuda(GPU_ID)
-        criterion = torch.nn.CrossEntropyLoss().cuda(GPU_ID)
+        criterion = torch.nn.CrossEntropyLoss().cuda()
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS)
