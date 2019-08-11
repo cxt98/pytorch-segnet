@@ -10,6 +10,12 @@ python train.py --data_root /home/SharedData/intern_sayan/PascalVOC2012/data/VOC
                 --save_dir /home/SharedData/intern_sayan/PascalVOC2012/ \
                 --checkpoint /home/SharedData/intern_sayan/PascalVOC2012/model_best.pth \
                 --gpu 1
+
+new lf usage
+
+python ./src/train.py --data_root /home/cxt/Documents/research/lf_dope/lf_trans_dataset/synthetic/ --save_dir /home/cxt/Documents/research/lf_dope/pytorch-segnet/checkpoint/ 
+                
+
 """
 
 from __future__ import print_function
@@ -90,9 +96,6 @@ def train():
 
 if __name__ == "__main__":
     data_root = args.data_root
-    # train_path = os.path.join(data_root, args.train_path)
-    # img_dir = os.path.join(data_root, args.img_dir)
-    # mask_dir = os.path.join(data_root, args.mask_dir)
 
     CUDA = 1 # args.gpu is not None
     GPU_ID = 0
@@ -103,25 +106,26 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=BATCH_SIZE,
                                   shuffle=True,
-                                  num_workers=1)
+                                  num_workers=4)
 
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS).cuda(GPU_ID)
 
-        class_weights = 1.0/train_dataset.get_class_probability().cuda(GPU_ID)
+        # class_weights = 1.0/train_dataset.get_class_probability().cuda(GPU_ID)
         criterion = torch.nn.CrossEntropyLoss().cuda(GPU_ID)
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS)
 
-        class_weights = 1.0/train_dataset.get_class_probability()
+        # class_weights = 1.0/train_dataset.get_class_probability()
         criterion = torch.nn.CrossEntropyLoss()
 
 
     if args.checkpoint:
         model.load_state_dict(torch.load(args.checkpoint))
+        
 
 
     optimizer = torch.optim.Adam(model.parameters(),
