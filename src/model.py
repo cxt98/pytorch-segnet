@@ -10,7 +10,7 @@ import torchvision.models as models
 import pprint
 
 F = nn.functional
-DEBUG = False
+DEBUG = True
 
 
 vgg16_dims = [
@@ -38,14 +38,26 @@ class SegNet(nn.Module):
         self.output_channels = output_channels
 
         self.num_channels = input_channels
+        
+        self.angular_size = 5
 
         self.vgg16 = models.vgg16(pretrained=True)
+        
+        # add an angular filter layer before feature extraction
+        
+        self.angular_conv = nn.Sequential(*[
+                                            nn.Conv2d(in_channels=self.input_channels,
+                                                    out_channels=3,
+                                                    kernel_size=self.angular_size,
+                                                    padding=self.angular_size),
+                                            nn.BatchNorm2d(3)
+                                            ])
 
 
         # Encoder layers
 
         self.encoder_conv_00 = nn.Sequential(*[
-                                                nn.Conv2d(in_channels=self.input_channels,
+                                                nn.Conv2d(in_channels=3,
                                                           out_channels=64,
                                                           kernel_size=3,
                                                           padding=1),
@@ -237,11 +249,14 @@ class SegNet(nn.Module):
         Forward pass `input_img` through the network
         """
 
-        # Encoder
+        # Encoder - angular filter layer
+        dim_ang = input_img.size()
+        x_ang0 = F.relu(self.angular_conv(input_img))
+        
 
         # Encoder Stage - 1
         dim_0 = input_img.size()
-        x_00 = F.relu(self.encoder_conv_00(input_img))
+        x_00 = F.relu(self.encoder_conv_00(x_ang0))
         x_01 = F.relu(self.encoder_conv_01(x_00))
         x_0, indices_0 = F.max_pool2d(x_01, kernel_size=2, stride=2, return_indices=True)
 
@@ -313,6 +328,7 @@ class SegNet(nn.Module):
 
 
         if DEBUG:
+            print("dim_ang: {}".format(dim_ang))
             print("dim_0: {}".format(dim_0))
             print("dim_1: {}".format(dim_1))
             print("dim_2: {}".format(dim_2))
@@ -331,10 +347,10 @@ class SegNet(nn.Module):
 
 
     def init_vgg_weigts(self):
-        assert self.encoder_conv_00[0].weight.size() == self.vgg16.features[0].weight.size()
-        self.encoder_conv_00[0].weight.data = self.vgg16.features[0].weight.data
-        assert self.encoder_conv_00[0].bias.size() == self.vgg16.features[0].bias.size()
-        self.encoder_conv_00[0].bias.data = self.vgg16.features[0].bias.data
+        # assert self.encoder_conv_00[0].weight.size() == self.vgg16.features[0].weight.size()
+        # self.encoder_conv_00[0].weight.data = self.vgg16.features[0].weight.data
+        # assert self.encoder_conv_00[0].bias.size() == self.vgg16.features[0].bias.size()
+        # self.encoder_conv_00[0].bias.data = self.vgg16.features[0].bias.data
 
         assert self.encoder_conv_01[0].weight.size() == self.vgg16.features[2].weight.size()
         self.encoder_conv_01[0].weight.data = self.vgg16.features[2].weight.data

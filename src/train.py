@@ -14,7 +14,7 @@ python train.py --data_root /home/SharedData/intern_sayan/PascalVOC2012/data/VOC
 
 from __future__ import print_function
 import argparse
-from dataset import PascalVOCDataset, NUM_CLASSES
+from dataset import LFDataset, NUM_CLASSES
 from model import SegNet
 import os
 import time
@@ -30,16 +30,16 @@ NUM_EPOCHS = 6000
 
 LEARNING_RATE = 1e-6
 MOMENTUM = 0.9
-BATCH_SIZE = 16
+BATCH_SIZE = 1
 
 
 # Arguments
 parser = argparse.ArgumentParser(description='Train a SegNet model')
 
 parser.add_argument('--data_root', required=True)
-parser.add_argument('--train_path', required=True)
-parser.add_argument('--img_dir', required=True)
-parser.add_argument('--mask_dir', required=True)
+# parser.add_argument('--train_path', required=True)
+# parser.add_argument('--img_dir', required=True)
+# parser.add_argument('--mask_dir', required=True)
 parser.add_argument('--save_dir', required=True)
 parser.add_argument('--checkpoint')
 parser.add_argument('--gpu', type=int)
@@ -90,22 +90,20 @@ def train():
 
 if __name__ == "__main__":
     data_root = args.data_root
-    train_path = os.path.join(data_root, args.train_path)
-    img_dir = os.path.join(data_root, args.img_dir)
-    mask_dir = os.path.join(data_root, args.mask_dir)
+    # train_path = os.path.join(data_root, args.train_path)
+    # img_dir = os.path.join(data_root, args.img_dir)
+    # mask_dir = os.path.join(data_root, args.mask_dir)
 
     CUDA = args.gpu is not None
     GPU_ID = args.gpu
 
 
-    train_dataset = PascalVOCDataset(list_file=train_path,
-                                     img_dir=img_dir,
-                                     mask_dir=mask_dir)
+    train_dataset = LFDataset(root_path=data_root)
 
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=BATCH_SIZE,
                                   shuffle=True,
-                                  num_workers=4)
+                                  num_workers=1)
 
 
     if CUDA:
