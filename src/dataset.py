@@ -15,7 +15,7 @@ from os.path import exists
 LF_CLASSES = ('background',  # always index 0
                'glass')
 
-NUM_CLASSES = len(LF_CLASSES) + 1
+NUM_CLASSES = len(LF_CLASSES)
 
 class LFDataset(Dataset):
     def __init__(self, root_path, transform=None):
@@ -26,10 +26,10 @@ class LFDataset(Dataset):
         self.angular_size = 5
 
         self.root_path = root_path
-
-        self.counts = self.__compute_class_probability()
         
         self.findallimg(self.root_path) # save paths of all images, masks to self.images, self.masks
+
+        self.counts = self.__compute_class_probability()
 
     def __len__(self):
         return len(self.images)
@@ -48,12 +48,11 @@ class LFDataset(Dataset):
     def __compute_class_probability(self):
         counts = dict((i, 0) for i in range(NUM_CLASSES))
 
-        for name in self.images:
-            mask_path = os.path.join(self.mask_root_dir, name + self.mask_extension)
+        for mask_path in self.masks:
 
-            raw_image = Image.open(mask_path).resize((224, 224))
-            imx_t = np.array(raw_image).reshape(224*224)
-            # imx_t[imx_t==255] = len(LF_CLASSES)
+            raw_image = Image.open(mask_path)
+            imx_t = np.array(raw_image)
+            imx_t[imx_t==255] = NUM_CLASSES - 1
 
             for i in range(NUM_CLASSES):
                 counts[i] += np.sum(imx_t == i)
@@ -114,11 +113,12 @@ class LFDataset(Dataset):
         return imx_t
 
     def load_mask(self, path=None):
-        raw_image = Image.open(path)
+        raw_image = Image.open(path)#.convert('RGB')
+        # raw_image = np.transpose(raw_image, (2, 1, 0))
         # raw_image = raw_image.resize((224, 224))
         imx_t = np.array(raw_image)
         # border
-        # imx_t[imx_t==255] = len(LF_CLASSES)
+        imx_t[imx_t==255] = 1
 
         return imx_t
 
@@ -162,7 +162,7 @@ class PascalLFDataset(Dataset):
 
             raw_image = Image.open(mask_path).resize((224, 224))
             imx_t = np.array(raw_image).reshape(224*224)
-            imx_t[imx_t==255] = len(LF_CLASSES)
+            imx_t[imx_t==255] = NUM_CLASSES
 
             for i in range(NUM_CLASSES):
                 counts[i] += np.sum(imx_t == i)
@@ -187,7 +187,7 @@ class PascalLFDataset(Dataset):
         raw_image = raw_image.resize((224, 224))
         imx_t = np.array(raw_image)
         # border
-        imx_t[imx_t==255] = len(LF_CLASSES)
+        imx_t[imx_t==255] = NUM_CLASSES
 
         return imx_t
 

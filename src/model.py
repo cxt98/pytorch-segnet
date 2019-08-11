@@ -10,7 +10,7 @@ import torchvision.models as models
 import pprint
 
 F = nn.functional
-DEBUG = True
+DEBUG = False
 
 
 vgg16_dims = [
@@ -47,17 +47,18 @@ class SegNet(nn.Module):
         
         self.angular_conv = nn.Sequential(*[
                                             nn.Conv2d(in_channels=self.input_channels,
-                                                    out_channels=3,
+                                                    out_channels=64,
                                                     kernel_size=self.angular_size,
-                                                    padding=self.angular_size),
-                                            nn.BatchNorm2d(3)
+                                                    stride=self.angular_size,
+                                                    padding=0),
+                                            nn.BatchNorm2d(64)
                                             ])
 
 
         # Encoder layers
 
         self.encoder_conv_00 = nn.Sequential(*[
-                                                nn.Conv2d(in_channels=3,
+                                                nn.Conv2d(in_channels=64,
                                                           out_channels=64,
                                                           kernel_size=3,
                                                           padding=1),
@@ -255,7 +256,10 @@ class SegNet(nn.Module):
         
 
         # Encoder Stage - 1
+        # dim_0 = [input_img.size()[0]/5, input_img.size()[1]/5]
         dim_0 = input_img.size()
+        dim_0 = torch.Size([dim_0[0],dim_0[1],dim_0[2]/self.angular_size,dim_0[3]/self.angular_size])
+
         x_00 = F.relu(self.encoder_conv_00(x_ang0))
         x_01 = F.relu(self.encoder_conv_01(x_00))
         x_0, indices_0 = F.max_pool2d(x_01, kernel_size=2, stride=2, return_indices=True)
@@ -318,6 +322,7 @@ class SegNet(nn.Module):
         x_10d = F.relu(self.decoder_convtr_10(x_11d))
         dim_1d = x_10d.size()
 
+
         # Decoder Stage - 1
         x_0d = F.max_unpool2d(x_10d, indices_0, kernel_size=2, stride=2, output_size=dim_0)
         x_01d = F.relu(self.decoder_convtr_01(x_0d))
@@ -325,7 +330,6 @@ class SegNet(nn.Module):
         dim_0d = x_00d.size()
 
         x_softmax = F.softmax(x_00d, dim=1)
-
 
         if DEBUG:
             print("dim_ang: {}".format(dim_ang))
@@ -341,6 +345,8 @@ class SegNet(nn.Module):
             print("dim_2d: {}".format(dim_2d))
             print("dim_1d: {}".format(dim_1d))
             print("dim_0d: {}".format(dim_0d))
+
+       
 
 
         return x_00d, x_softmax

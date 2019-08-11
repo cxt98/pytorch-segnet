@@ -30,7 +30,7 @@ NUM_EPOCHS = 6000
 
 LEARNING_RATE = 1e-6
 MOMENTUM = 0.9
-BATCH_SIZE = 1
+BATCH_SIZE = 2
 
 
 # Arguments
@@ -42,7 +42,7 @@ parser.add_argument('--data_root', required=True)
 # parser.add_argument('--mask_dir', required=True)
 parser.add_argument('--save_dir', required=True)
 parser.add_argument('--checkpoint')
-parser.add_argument('--gpu', type=int)
+# parser.add_argument('--gpu', type=int)
 
 args = parser.parse_args()
 
@@ -94,8 +94,8 @@ if __name__ == "__main__":
     # img_dir = os.path.join(data_root, args.img_dir)
     # mask_dir = os.path.join(data_root, args.mask_dir)
 
-    CUDA = args.gpu is not None
-    GPU_ID = args.gpu
+    CUDA = 1 # args.gpu is not None
+    GPU_ID = 0
 
 
     train_dataset = LFDataset(root_path=data_root)
@@ -111,13 +111,13 @@ if __name__ == "__main__":
                        output_channels=NUM_OUTPUT_CHANNELS).cuda(GPU_ID)
 
         class_weights = 1.0/train_dataset.get_class_probability().cuda(GPU_ID)
-        criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda(GPU_ID)
+        criterion = torch.nn.CrossEntropyLoss().cuda(GPU_ID)
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS)
 
         class_weights = 1.0/train_dataset.get_class_probability()
-        criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+        criterion = torch.nn.CrossEntropyLoss()
 
 
     if args.checkpoint:
@@ -129,3 +129,6 @@ if __name__ == "__main__":
 
 
     train()
+
+
+    print('train over')
