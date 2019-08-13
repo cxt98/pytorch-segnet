@@ -35,7 +35,7 @@ NUM_OUTPUT_CHANNELS = NUM_CLASSES
 NUM_EPOCHS = 60
 
 LEARNING_RATE = 1e-4
-BATCH_SIZE = 16
+BATCH_SIZE = 20
 
 
 # Arguments
@@ -92,7 +92,7 @@ def train():
         if is_better:
             prev_loss = loss_f
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best.pth"))
-        if epoch % 20 == 0:
+        if epoch % 2 == 0:
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
         print("Epoch #{}\tLoss: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, delta))
 
@@ -117,8 +117,8 @@ if __name__ == "__main__":
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS).cuda()
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
-        # class_weights = 1.0/train_dataset.get_class_probability().cuda(GPU_ID)
-        criterion = torch.nn.CrossEntropyLoss().cuda()
+        class_weights = 1.0/train_dataset.get_class_probability().cuda()
+        criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS)

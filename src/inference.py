@@ -86,7 +86,7 @@ def validate():
             a.set_title('Predicted Mask')
 
             a = fig.add_subplot(1,3,3)
-            target_mx = (target_mask.data.cpu().numpy() * 255)
+            target_mx = target_mask.data.cpu().numpy() * 255
             Image.fromarray(target_mx.astype(np.uint8)).save(str(idx) + '.png')
             plt.imshow(target_mx)
             a.set_title('Ground Truth')
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     val_dataloader = DataLoader(val_dataset,
                                 batch_size=BATCH_SIZE,
-                                shuffle=True,
+                                shuffle=False,
                                 num_workers=4)
 
 

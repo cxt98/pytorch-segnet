@@ -26,11 +26,11 @@ class LFDataset(Dataset):
         self.angular_size = 5
 
         self.root_path = root_path
-        
-        self.findallimg(self.root_path) # save paths of all images, masks to self.images, self.masks
 
-        print ("Load data complete")
+        self.findallimg(self.root_path) # save paths of all images, masks to self.images, self.masks
         self.counts = self.__compute_class_probability()
+        print ("Load data complete")
+
 
     def __len__(self):
         return len(self.images)
@@ -53,8 +53,8 @@ class LFDataset(Dataset):
 
             raw_image = Image.open(mask_path)
             imx_t = np.array(raw_image)
-            imx_t[imx_t==255] = NUM_CLASSES - 1
-
+            imx_t[imx_t < 255] = 0
+            imx_t[imx_t==255] = 1
             for i in range(NUM_CLASSES):
                 counts[i] += np.sum(imx_t == i)
 
@@ -62,7 +62,7 @@ class LFDataset(Dataset):
 
     def get_class_probability(self):
         values = np.array(list(self.counts.values()))
-        p_values = values/np.sum(values)
+        p_values = values/float(np.sum(values))
 
         return torch.Tensor(p_values)
     
@@ -124,8 +124,8 @@ class LFDataset(Dataset):
         # raw_image = raw_image.resize((224, 224))
         imx_t = np.array(raw_image)
         # border
-        imx_t[imx_t == 255] = 1
         imx_t[imx_t < 255] = 0
+        imx_t[imx_t == 255] = 1
         return imx_t
 
 class PascalLFDataset(Dataset):
