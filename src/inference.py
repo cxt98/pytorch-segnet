@@ -62,9 +62,9 @@ def validate():
         input_tensor = torch.autograd.Variable(batch['image'])
         target_tensor = torch.autograd.Variable(batch['mask'])
 
-        if CUDA:
-            input_tensor = input_tensor.cuda(GPU_ID)
-            target_tensor = target_tensor.cuda(GPU_ID)
+        # if CUDA:
+        #     input_tensor = input_tensor.cuda()
+        #     target_tensor = target_tensor.cuda()
 
         predicted_tensor, softmaxed_tensor = model(input_tensor)
         # loss = criterion(predicted_tensor, target_tensor)
@@ -80,13 +80,14 @@ def validate():
             a.set_title('Input Image')
 
             a = fig.add_subplot(1,3,2)
-            predicted_mx = predicted_mask.detach().cpu().numpy()
+            predicted_mx = predicted_mask.data.cpu().numpy()
             predicted_mx = predicted_mx.argmax(axis=0)
             plt.imshow(predicted_mx)
             a.set_title('Predicted Mask')
 
             a = fig.add_subplot(1,3,3)
-            target_mx = target_mask.detach().cpu().numpy()
+            target_mx = (target_mask.data.cpu().numpy() * 255)
+            Image.fromarray(target_mx.astype(np.uint8)).save(str(idx) + '.png')
             plt.imshow(target_mx)
             a.set_title('Ground Truth')
 
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     OUTPUT_DIR = args.output_dir
 
     CUDA = 1
-    GPU_ID = 0
+    GPU_ID = [0]
 
     val_dataset = LFDataset(root_path=data_root)
 
@@ -113,10 +114,10 @@ if __name__ == "__main__":
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
-                       output_channels=NUM_OUTPUT_CHANNELS).cuda(GPU_ID)
-
+                       output_channels=NUM_OUTPUT_CHANNELS).cuda()
+        model = torch.nn.DataParallel(model, GPU_ID).cuda() 
         # class_weights = 1.0/val_dataset.get_class_probability().cuda(GPU_ID)
-        criterion = torch.nn.CrossEntropyLoss().cuda(GPU_ID)
+        criterion = torch.nn.CrossEntropyLoss().cuda()
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS)
@@ -125,5 +126,5 @@ if __name__ == "__main__":
         criterion = torch.nn.CrossEntropyLoss()
 
     model.load_state_dict(torch.load(SAVED_MODEL_PATH))
-
+    
     validate()
