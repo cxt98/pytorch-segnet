@@ -32,9 +32,9 @@ import torch.nn.parallel
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES
 
-NUM_EPOCHS = 60
+NUM_EPOCHS = 100
 
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 BATCH_SIZE = 20
 
 
@@ -92,7 +92,7 @@ def train():
         if is_better:
             prev_loss = loss_f
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best.pth"))
-        if epoch % 2 == 0:
+        if epoch % 10 == 0:
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
         print("Epoch #{}\tLoss: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, delta))
 

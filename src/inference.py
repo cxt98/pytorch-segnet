@@ -75,21 +75,21 @@ def validate():
 
             fig = plt.figure()
 
-            a = fig.add_subplot(1,3,1)
+            a = fig.add_subplot(1,2,1)
             plt.imshow(input_image.transpose(0, 2).transpose(0, 1))
             a.set_title('Input Image')
 
-            a = fig.add_subplot(1,3,2)
+            a = fig.add_subplot(1,2,2)
             predicted_mx = predicted_mask.data.cpu().numpy()
             predicted_mx = predicted_mx.argmax(axis=0)
             plt.imshow(predicted_mx)
             a.set_title('Predicted Mask')
 
-            a = fig.add_subplot(1,3,3)
-            target_mx = target_mask.data.cpu().numpy() * 255
-            Image.fromarray(target_mx.astype(np.uint8)).save(str(idx) + '.png')
-            plt.imshow(target_mx)
-            a.set_title('Ground Truth')
+            # a = fig.add_subplot(1,3,3)
+            # target_mx = target_mask.data.cpu().numpy() * 255
+            # Image.fromarray(target_mx.astype(np.uint8)).save(str(idx) + '.png')
+            # plt.imshow(target_mx)
+            # a.set_title('Ground Truth')
 
             fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_{}.png".format(batch_idx, idx)))
 
