@@ -60,7 +60,6 @@ def validate():
 
     for batch_idx, batch in enumerate(val_dataloader):
         input_tensor = torch.autograd.Variable(batch['image'])
-        target_tensor = torch.autograd.Variable(batch['mask'])
 
         # if CUDA:
         #     input_tensor = input_tensor.cuda()
@@ -68,15 +67,14 @@ def validate():
 
         predicted_tensor, softmaxed_tensor = model(input_tensor)
         # loss = criterion(predicted_tensor, target_tensor)
-        
+
         for idx, predicted_mask in enumerate(softmaxed_tensor):
-            target_mask = target_tensor[idx]
             input_image = input_tensor[idx]
 
             fig = plt.figure()
 
             a = fig.add_subplot(1,2,1)
-            plt.imshow(input_image.transpose(0, 2).transpose(0, 1))
+            plt.imshow(input_image[:,13].transpose(0, 2).transpose(0, 1)) # extract CenterView from 3D LF input
             a.set_title('Input Image')
 
             a = fig.add_subplot(1,2,2)
@@ -92,7 +90,7 @@ def validate():
             # a.set_title('Ground Truth')
 
             fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_{}.png".format(batch_idx, idx)))
-
+            print("Predicted {}_{}th frame".format(batch_idx, idx))
             plt.close(fig)
 
 
@@ -102,9 +100,9 @@ if __name__ == "__main__":
     OUTPUT_DIR = args.output_dir
 
     CUDA = 1
-    GPU_ID = [0]
+    GPU_ID = [0,1]
 
-    val_dataset = LFDataset(root_path=data_root)
+    val_dataset = LFDataset(root_path=data_root, validation=True)
 
     val_dataloader = DataLoader(val_dataset,
                                 batch_size=BATCH_SIZE,
