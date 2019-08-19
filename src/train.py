@@ -35,7 +35,7 @@ NUM_OUTPUT_CHANNELS = NUM_CLASSES
 NUM_EPOCHS = 100
 
 LEARNING_RATE = 1e-5
-BATCH_SIZE = 16
+BATCH_SIZE = 12
 
 
 # Arguments
@@ -47,6 +47,7 @@ parser.add_argument('--data_root', required=True)
 # parser.add_argument('--mask_dir', required=True)
 parser.add_argument('--save_dir', required=True)
 parser.add_argument('--checkpoint')
+parser.add_argument('--edgemap')
 # parser.add_argument('--gpu', type=int)
 
 args = parser.parse_args()
@@ -103,15 +104,15 @@ if __name__ == "__main__":
     CUDA = 1 # args.gpu is not None
     GPU_ID = [0,1]
 
+    if args.edgemap:
+        edgemap = True
 
-    train_dataset = LFDataset(root_path=data_root)
+    train_dataset = LFDataset(root_path=data_root, edgemap=edgemap)
 
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=BATCH_SIZE,
                                   shuffle=True,
                                   num_workers=6)
-
-
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
@@ -126,17 +127,11 @@ if __name__ == "__main__":
         # class_weights = 1.0/train_dataset.get_class_probability()
         criterion = torch.nn.CrossEntropyLoss()
 
-
     if args.checkpoint:
         model.load_state_dict(torch.load(args.checkpoint))
-        
 
-
-    optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=LEARNING_RATE)
-
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     train()
-
 
     print('train over')

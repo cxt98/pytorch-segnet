@@ -18,13 +18,13 @@ NUM_CLASSES = len(LF_CLASSES)
 
 
 class LFDataset(Dataset):
-    def __init__(self, root_path, transform=None, validation=False):
+    def __init__(self, root_path, transform=None, validation=False, edgemap=False):
         self.images = []
         self.masks = []
         self.transform = transform
         self.validation = validation
         self.angular_size = 5
-
+        self.edgemap = edgemap
         self.root_path = root_path
 
         if self.validation:
@@ -96,7 +96,10 @@ class LFDataset(Dataset):
             if len(glob.glob(path + "/*.Sub3_3.png")) > 0:
                 # FIRST TIME: exists subaperture images: combine to light field images then remove subapertures
                 for subpath in sorted(glob.glob(path + "/*.Sub3_3.png")):
-                    maskpath = subpath.replace('.png', '.cs.png')
+                    if self.edgemap:
+                        maskpath = subpath.replace('.png', '.cs.edge.png')
+                    else:
+                        maskpath = subpath.replace('.png', '.cs.png')
                     if exists(maskpath):
                         self.masks.append(maskpath)
                         lfpath = subpath.replace('.png', '.lf.png')

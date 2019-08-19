@@ -89,14 +89,14 @@ def validate():
             # plt.imshow(target_mx)
             # a.set_title('Ground Truth')
 
-            fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_{}.png".format(batch_idx, idx)))
-            print("Predicted {}_{}th frame".format(batch_idx, idx))
+            fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}.png".format(batch_idx)))
+            print("Predicted {}th frame".format(batch_idx))
             plt.close(fig)
 
 
 if __name__ == "__main__":
     data_root = args.data_root
-    SAVED_MODEL_PATH = args.model_path + 'model_best.pth'
+    SAVED_MODEL_PATH = args.model_path
     OUTPUT_DIR = args.output_dir
 
     CUDA = 1
