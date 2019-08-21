@@ -27,16 +27,17 @@ import time
 import torch
 from torch.utils.data import DataLoader
 import torch.nn.parallel
+import torch.nn as nn
 
 # Constants
 NUM_INPUT_CHANNELS = 3
-NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1 # boundary around object
-NUM_KEYPOINTS = 8
+NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1  # boundary around object
+NUM_KEYPOINTS = 8 + 1  # 8 corners + 1 center
 
 NUM_EPOCHS = 100
 
 LEARNING_RATE = 1e-5
-BATCH_SIZE = 1
+BATCH_SIZE = 12
 
 
 # Arguments
@@ -68,17 +69,18 @@ def train():
         for batch in train_dataloader:
             input_tensor = torch.autograd.Variable(batch['image'])
             seg_target_tensor = torch.autograd.Variable(batch['mask'])
-            key_target_tensor = torch.autograd.Variable(batch['keymap'])
+            key_target_tensor = torch.autograd.Variable(batch['gt_offset'])
 
             if CUDA:
                 input_tensor = input_tensor.cuda()
                 seg_target_tensor = seg_target_tensor.cuda()
+                key_target_tensor = key_target_tensor.cuda()
 
             seg_tensor, key_tensor = model(input_tensor)
 
             optimizer.zero_grad()
             loss_seg = criterion(seg_tensor, seg_target_tensor)
-            loss_key = model.calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor)
+            loss_key = calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor)
             loss = loss_seg + loss_key
             loss.backward()
             optimizer.step()
@@ -103,18 +105,58 @@ def train():
         print("Epoch #{}\tLoss: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, delta))
 
 
+def calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor):
+    # position loss: sum(seg)sum(keypoints)|delta(pos)|
+    # confidence loss: sum(seg)sum(keypoints)|conf - exp(-tau * delta(pos)|
+
+    # key_tensor: (nBatch, 3*nKeypoints (x1, x2, xN, y1, y2, yN, conf1, conf2, confN), nWidth, nHeight)
+    # key_target_tensor: (nBatch, 2*nKeypoints (x1, x2, xN, y1, y2, yN), nWidth, nHeight)
+    beta = 0.8
+    gamma = 1 - beta
+    tau = 1
+    norm_factor = 10
+
+    nBatch, nWidth, nHeight = seg_target_tensor.size()
+    seg_target_tensor = seg_target_tensor.view(nBatch * nWidth * nHeight)
+
+    nKeypoints = key_tensor.size(1) / 3
+    key_tensor = key_tensor.transpose(dim0=0, dim1=1).contiguous().view(3 * nKeypoints, nBatch * nWidth * nHeight)
+    key_target_tensor = key_target_tensor.transpose(dim0=0, dim1=1).contiguous().view(2 * nKeypoints, nBatch * nWidth * nHeight)
+
+    roi_ind = seg_target_tensor.nonzero().squeeze()
+    key_tensor = key_tensor.index_select(dim=1, index=roi_ind)
+    xy_gt = key_target_tensor.index_select(dim=1, index=roi_ind)
+
+    # key_tensor: (3*nKeypoints, sum_batch(nSegpoints)), key_target_tensor: (2*nKeypoints, sum_batch(nSegpoints))
+
+    # change last dim to 2 for piecewise distance
+    xy_pred = torch.stack((key_tensor[:nKeypoints].view(nKeypoints * roi_ind.size(0)),
+                           key_tensor[nKeypoints:2*nKeypoints].view(nKeypoints * roi_ind.size(0))), dim=1)
+    xy_gt = torch.stack((xy_gt[:nKeypoints].view(nKeypoints * roi_ind.size(0)),
+                         xy_gt[nKeypoints:2*nKeypoints].view(nKeypoints * roi_ind.size(0))), dim=1)
+    conf_pred = key_tensor[2*nKeypoints:].view(nKeypoints * roi_ind.size(0))
+
+    L1loss = nn.L1Loss()
+    pos_loss = L1loss(xy_pred, xy_gt) / nWidth
+
+    pdist = nn.PairwiseDistance(p=2)
+    conf_loss = L1loss(conf_pred, torch.exp(-tau * pdist(xy_pred, xy_gt)).detach())
+
+    return norm_factor * (beta * pos_loss + gamma * conf_loss)
+
+
 if __name__ == "__main__":
     data_root = args.data_root
 
     CUDA = 1 # args.gpu is not None
-    GPU_ID = 0
+    GPU_ID = [0, 1]
 
     if args.edgemap:
         edgemap = True
     else:
         edgemap = False
 
-    train_dataset = LFDataset(root_path=data_root, edgemap=edgemap, batch_size=BATCH_SIZE)
+    train_dataset = LFDataset(root_path=data_root, edgemap=edgemap)
 
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=BATCH_SIZE,
@@ -124,7 +166,7 @@ if __name__ == "__main__":
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
-        model = torch.nn.DataParallel(model).cuda(GPU_ID)
+        model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
     else:

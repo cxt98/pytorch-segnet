@@ -354,7 +354,7 @@ class SegNet(nn.Module):
         ])
         self.decoder_convtr_00_k = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=64,
-                               out_channels=self.output_channels,
+                               out_channels=3*self.keypoints,
                                kernel_size=3,
                                padding=1)
         ])
@@ -448,44 +448,46 @@ class SegNet(nn.Module):
         x_00d = self.decoder_convtr_00(x_01d)
         dim_0d = x_00d.size()
 
-        xseg_softmax = F.softmax(x_00d, dim=1)
+        xseg_output = F.softmax(x_00d, dim=1)
 
         # Another decoder branch for regressing keypoints
 
         # Decoder Stage - 5
         x_4d_k = F.max_unpool2d(x_4, indices_4, kernel_size=2, stride=2, output_size=dim_4)
-        x_42d_k = F.relu(self.decoder_convtr_42(x_4d_k))
-        x_41d_k = F.relu(self.decoder_convtr_41(x_42d_k))
-        x_40d_k = F.relu(self.decoder_convtr_40(x_41d_k))
+        x_42d_k = F.relu(self.decoder_convtr_42_k(x_4d_k))
+        x_41d_k = F.relu(self.decoder_convtr_41_k(x_42d_k))
+        x_40d_k = F.relu(self.decoder_convtr_40_k(x_41d_k))
         dim_4d_k = x_40d_k.size()
 
         # Decoder Stage - 4
         x_3d_k = F.max_unpool2d(x_40d, indices_3, kernel_size=2, stride=2, output_size=dim_3)
-        x_32d_k = F.relu(self.decoder_convtr_32(x_3d_k))
-        x_31d_k = F.relu(self.decoder_convtr_31(x_32d_k))
-        x_30d_k = F.relu(self.decoder_convtr_30(x_31d_k))
+        x_32d_k = F.relu(self.decoder_convtr_32_k(x_3d_k))
+        x_31d_k = F.relu(self.decoder_convtr_31_k(x_32d_k))
+        x_30d_k = F.relu(self.decoder_convtr_30_k(x_31d_k))
         dim_3d_k = x_30d_k.size()
 
         # Decoder Stage - 3
         x_2d_k = F.max_unpool2d(x_30d_k, indices_2, kernel_size=2, stride=2, output_size=dim_2)
-        x_22d_k = F.relu(self.decoder_convtr_22(x_2d_k))
-        x_21d_k = F.relu(self.decoder_convtr_21(x_22d_k))
-        x_20d_k = F.relu(self.decoder_convtr_20(x_21d_k))
+        x_22d_k = F.relu(self.decoder_convtr_22_k(x_2d_k))
+        x_21d_k = F.relu(self.decoder_convtr_21_k(x_22d_k))
+        x_20d_k = F.relu(self.decoder_convtr_20_k(x_21d_k))
         dim_2d_k = x_20d_k.size()
 
         # Decoder Stage - 2
         x_1d_k = F.max_unpool2d(x_20d_k, indices_1, kernel_size=2, stride=2, output_size=dim_1)
-        x_11d_k = F.relu(self.decoder_convtr_11(x_1d_k))
-        x_10d_k = F.relu(self.decoder_convtr_10(x_11d_k))
+        x_11d_k = F.relu(self.decoder_convtr_11_k(x_1d_k))
+        x_10d_k = F.relu(self.decoder_convtr_10_k(x_11d_k))
         dim_1d_k = x_10d_k.size()
 
         # Decoder Stage - 1
         x_0d_k = F.max_unpool2d(x_10d_k, indices_0, kernel_size=2, stride=2, output_size=dim_0)
-        x_01d_k = F.relu(self.decoder_convtr_01(x_0d_k))
-        x_00d_k = self.decoder_convtr_00(x_01d_k)
+        x_01d_k = F.relu(self.decoder_convtr_01_k(x_0d_k))
+        x_00d_k = self.decoder_convtr_00_k(x_01d_k)
         dim_0d_k = x_00d_k.size()
 
-        xkey_softmax = F.softmax(x_00d_k, dim=self.keypoints * 3)
+        # xkey_softmax = F.softmax(x_00d_k, dim=self.keypoints * 3)
+        xkey_output = x_00d_k
+        xkey_output[:, 2*self.keypoints:] = F.sigmoid(xkey_output[:, 2*self.keypoints:])
 
         if DEBUG:
             print("dim_ang: {}".format(dim_ang))
@@ -507,40 +509,9 @@ class SegNet(nn.Module):
             print("dim_1d_k: {}".format(dim_1d_k))
             print("dim_0d_k: {}".format(dim_0d_k))
 
-        return xseg_softmax, xkey_softmax
+        return xseg_output, xkey_output
 
-    def calculate_keyloss(self, key_tensor, key_target_tensor, seg_target_tensor):
-        # position loss: sum(seg)sum(keypoints)|delta(pos)|
-        # confidence loss: sum(seg)sum(keypoints)|conf - exp(-tau * delta(pos)|
 
-        # key_tensor: (nBatch, 3*nKeypoints (x1, y1, conf1, x2, y2, conf2, ...), nWidth * nHeight)
-        # key_target_tensor: (nBatch, 2*nKeypoints (x1, y1, x2, y2, ...), nWidth * nHeight)
-        beta = 0.8
-        gamma = 1 - beta
-        tau = 1
-        norm_factor = 10
-        roi_ind = torch.nonzero(seg_target_tensor)
-
-        l = list(range(key_tensor.data.size(1)))
-
-        key_tensor = key_tensor.index_select(dim=2, index=roi_ind)
-        nBatch, nKeypoints3X, nSegpoints = key_tensor.size()
-
-        xy_pred = torch.stack((key_tensor.index_select(dim=1, index=list(l[::3])),
-                             key_tensor.index_select(dim=1, index=list(l[1::3])))).view(nBatch * nKeypoints3X / 3 * nSegpoints, 2)
-
-        conf_pred = key_tensor.index_select(dim=1, index=list(l[2::3])).view(nBatch * nKeypoints3X / 3 * nSegpoints)
-        key_target_tensor = key_target_tensor.index_select(dim=2, index=roi_ind)
-        xy_gt = torch.stack((key_target_tensor.index_select(dim=1, index=list(l[::3])),
-                           key_target_tensor.index_select(dim=1, index=list(l[1::3])))).view(nBatch * nKeypoints3X / 3 * nSegpoints, 2)
-
-        L1loss = nn.L1Loss()
-        pos_loss = L1loss(xy_pred, xy_gt)
-
-        pdist = nn.PairwiseDistance(p=2)
-        conf_loss = L1loss(conf_pred - (-tau * torch.exp(pdist(xy_pred, xy_gt))))
-
-        return norm_factor * (beta * pos_loss + gamma * conf_loss)
 
     def init_vgg_weights(self):
         # assert self.encoder_conv_00[0].weight.size() == self.vgg16.features[0].weight.size()
