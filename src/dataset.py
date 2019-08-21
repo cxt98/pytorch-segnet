@@ -152,10 +152,10 @@ class LFDataset(Dataset):
 
         x_offset = (x_offset - x_mask) / img_size[1]
         y_offset = (y_offset - y_mask) / img_size[0]
-        self.save_offset_mask_to_img("/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/segmentation/test",x_offset,"x")
-        self.save_offset_mask_to_img(
-            "/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/segmentation/test", y_offset,
-            "y")
+        # self.save_offset_mask_to_img("/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/segmentation/test",x_offset,"x")
+        # self.save_offset_mask_to_img(
+        #     "/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/segmentation/test", y_offset,
+        #     "y")
         return np.concatenate((x_offset,y_offset),axis=2)
 
 

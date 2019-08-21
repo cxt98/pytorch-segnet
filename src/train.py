@@ -31,6 +31,7 @@ import torch.nn.parallel
 # Constants
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1 # boundary around object
+NUM_KEYPOINTS = 8
 
 NUM_EPOCHS = 100
 
@@ -66,24 +67,26 @@ def train():
         batch_id = 0
         for batch in train_dataloader:
             input_tensor = torch.autograd.Variable(batch['image'])
-            target_tensor = torch.autograd.Variable(batch['mask'])
+            seg_target_tensor = torch.autograd.Variable(batch['mask'])
+            key_target_tensor = torch.autograd.Variable(batch['keymap'])
 
             if CUDA:
                 input_tensor = input_tensor.cuda()
-                target_tensor = target_tensor.cuda()
+                seg_target_tensor = seg_target_tensor.cuda()
 
-            predicted_tensor, softmaxed_tensor = model(input_tensor)
-
+            seg_tensor, key_tensor = model(input_tensor)
 
             optimizer.zero_grad()
-            loss = criterion(softmaxed_tensor, target_tensor)
+            loss_seg = criterion(seg_tensor, seg_target_tensor)
+            loss_key = model.calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor)
+            loss = loss_seg + loss_key
             loss.backward()
             optimizer.step()
 
             if batch_id % 200 == 0:
                 print("Epoch #{}\tBatch #{}\tLoss: {:.8f}".format(epoch + 1, batch_id, loss))
             loss_f += loss.float()
-            prediction_f = softmaxed_tensor.float()
+            prediction_f = seg_tensor.float()
             batch_id = batch_id + 1
 
         loss_f = loss_f / len(train_dataloader)
@@ -104,14 +107,14 @@ if __name__ == "__main__":
     data_root = args.data_root
 
     CUDA = 1 # args.gpu is not None
-    GPU_ID = [0,1]
+    GPU_ID = 0
 
     if args.edgemap:
         edgemap = True
     else:
         edgemap = False
 
-    train_dataset = LFDataset(root_path=data_root, edgemap=edgemap)
+    train_dataset = LFDataset(root_path=data_root, edgemap=edgemap, batch_size=BATCH_SIZE)
 
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=BATCH_SIZE,
@@ -120,8 +123,8 @@ if __name__ == "__main__":
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
-                       output_channels=NUM_OUTPUT_CHANNELS).cuda()
-        model = torch.nn.DataParallel(model, GPU_ID).cuda()
+                       output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
+        model = torch.nn.DataParallel(model).cuda(GPU_ID)
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
     else:
