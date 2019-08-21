@@ -30,7 +30,7 @@ import torch.nn.parallel
 
 # Constants
 NUM_INPUT_CHANNELS = 3
-NUM_OUTPUT_CHANNELS = NUM_CLASSES
+NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1 # boundary around object
 
 NUM_EPOCHS = 100
 
@@ -93,8 +93,10 @@ def train():
         if is_better:
             prev_loss = loss_f
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best.pth"))
+            print("saved new best model")
         if epoch % 10 == 0:
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
+            print("saved new best model")
         print("Epoch #{}\tLoss: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, delta))
 
 
@@ -106,6 +108,8 @@ if __name__ == "__main__":
 
     if args.edgemap:
         edgemap = True
+    else:
+        edgemap = False
 
     train_dataset = LFDataset(root_path=data_root, edgemap=edgemap)
 

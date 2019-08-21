@@ -31,7 +31,7 @@ class LFDataset(Dataset):
             self.findallimg_validate(self.root_path)
         else:
             self.findallimg_train(self.root_path)  # save paths of all images, masks to self.images, self.masks
-        self.counts = self.__compute_class_probability()
+            self.counts = self.__compute_class_probability()
         print("Load data complete, image number: {}" .format(len(self.images)))
 
     def __len__(self):
@@ -53,16 +53,17 @@ class LFDataset(Dataset):
         return data
 
     def __compute_class_probability(self):
-        counts = dict((i, 0) for i in range(NUM_CLASSES))
+        counts = dict((i, 0) for i in range(NUM_CLASSES + 1))
 
         for mask_path in self.masks:
 
             raw_image = Image.open(mask_path)
             imx_t = np.array(raw_image)
-            imx_t[imx_t < 255] = 0
-            imx_t[imx_t == 255] = 1
+            # imx_t[imx_t < 255] = 0
+            # imx_t[imx_t == 255] = 1
             for i in range(NUM_CLASSES):
                 counts[i] += np.sum(imx_t == i)
+            counts[NUM_CLASSES] = counts[0]/50  # weight of boundary around objects, set 50x of background
 
         return counts
 
@@ -121,6 +122,7 @@ class LFDataset(Dataset):
                         self.masks.append(maskpath)
                         self.images.append(lfpath)
 
+
     def combine_img(self, path):
         # first check all subaperture imgs exist, then combine them and save as one lf image
         img = Image.open(path)
@@ -166,8 +168,8 @@ class LFDataset(Dataset):
         # raw_image = raw_image.resize((224, 224))
         imx_t = np.array(raw_image)
         # border
-        imx_t[imx_t < 255] = 0
-        imx_t[imx_t == 255] = 1
+        imx_t[imx_t == 255] = NUM_CLASSES
+
         return imx_t
 
 

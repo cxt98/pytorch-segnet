@@ -80,6 +80,9 @@ def validate():
             a = fig.add_subplot(1,2,2)
             predicted_mx = predicted_mask.data.cpu().numpy()
             predicted_mx = predicted_mx.argmax(axis=0)
+            # for display
+            predicted_mx[predicted_mx == 1] = 128
+            predicted_mx[predicted_mx == 2] = 255
             plt.imshow(predicted_mx)
             a.set_title('Predicted Mask')
 
@@ -89,7 +92,7 @@ def validate():
             # plt.imshow(target_mx)
             # a.set_title('Ground Truth')
 
-            fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}.png".format(batch_idx)))
+            fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_1.png".format(batch_idx)))
             print("Predicted {}th frame".format(batch_idx))
             plt.close(fig)
 
@@ -113,8 +116,8 @@ if __name__ == "__main__":
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS).cuda()
-        model = torch.nn.DataParallel(model, GPU_ID).cuda() 
-        # class_weights = 1.0/val_dataset.get_class_probability().cuda(GPU_ID)
+        model = torch.nn.DataParallel(model, GPU_ID).cuda()
+        # class_weights = 1.0 / val_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss().cuda()
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
