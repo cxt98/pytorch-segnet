@@ -35,7 +35,7 @@ NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1 # boundary around object
 NUM_EPOCHS = 100
 
 LEARNING_RATE = 1e-5
-BATCH_SIZE = 12
+BATCH_SIZE = 1
 
 
 # Arguments
@@ -80,7 +80,7 @@ def train():
             loss.backward()
             optimizer.step()
 
-            if batch_id % 20 == 0:
+            if batch_id % 200 == 0:
                 print("Epoch #{}\tBatch #{}\tLoss: {:.8f}".format(epoch + 1, batch_id, loss))
             loss_f += loss.float()
             prediction_f = softmaxed_tensor.float()

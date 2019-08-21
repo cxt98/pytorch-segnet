@@ -35,7 +35,7 @@ plt.axis('off')
 
 # Constants
 NUM_INPUT_CHANNELS = 3
-NUM_OUTPUT_CHANNELS = NUM_CLASSES
+NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1
 
 BATCH_SIZE = 1
 
@@ -92,7 +92,7 @@ def validate():
             # plt.imshow(target_mx)
             # a.set_title('Ground Truth')
 
-            fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_1.png".format(batch_idx)))
+            fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}.png".format(batch_idx)))
             print("Predicted {}th frame".format(batch_idx))
             plt.close(fig)
 
