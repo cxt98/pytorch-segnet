@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from model import SegNet
 import numpy as np
 import os
-from PIL import Image
+from PIL import Image, ImageDraw
 import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
@@ -53,6 +53,9 @@ parser.add_argument('--output_dir', required=True)
 
 args = parser.parse_args()
 
+# global variables for visualization
+g_img = None
+g_draw = None
 
 
 def validate():
@@ -96,8 +99,100 @@ def validate():
             print("Predicted {}th frame".format(batch_idx))
             plt.close(fig)
 
+            # processes to save 4d output "combined_map", "img" should be original image
+
+            # vertices_xy = get_bbox_vertices(combined_map)
+            # img = draw_bbox(vertices_xy, input_image[:,13])
+            # img.save("bbox_{}.png".format(batch_idx))
+
+
+def get_bbox_vertices(combined_map):
+    # combined map format: width(224) * height(224) * 3(offset_x, offset_y, conf) * nKeypoints(9)
+    # use weighted mean of top N estimates with highest confidence
+    topN = 30
+    row, col = np.nonzero(combined_map[:, :, 0, 0])
+    vertices_xy = []
+    for i in range(combined_map.shape[-1]):
+        vertices_candidate = np.transpose(np.vstack((combined_map[row, col, 0, i] + row, combined_map[row, col, 1, i] + col, combined_map[row, col, 2, i])))
+        sorted_candidate = sorted(vertices_candidate, key=lambda entry: entry[-1], reverse=True)
+        vertices_xy.append((np.average(sorted_candidate[0][:topN], weights=sorted_candidate[-1][:topN]),
+                           np.average(sorted_candidate[1][:topN], weights=sorted_candidate[-1][:topN])))
+    return vertices_xy
+
+
+def draw_bbox(vertices_xy, img, color=(255, 0, 0)):
+
+    def DrawLine(point1, point2, lineColor, lineWidth):
+        '''Draws line on image'''
+        global g_draw
+        if not point1 is None and point2 is not None:
+            g_draw.line([point1, point2], fill=lineColor, width=lineWidth)
+
+    def DrawDot(point, pointColor, pointRadius):
+        '''Draws dot (filled circle) on image'''
+        global g_draw
+        if point is not None:
+            xy = [
+                point[0] - pointRadius,
+                point[1] - pointRadius,
+                point[0] + pointRadius,
+                point[1] + pointRadius
+            ]
+            g_draw.ellipse(xy,
+                           fill=pointColor,
+                           outline=pointColor
+                           )
+
+    def DrawCube(points, color=(255, 0, 0)):
+        '''
+        Draws cube with a thick solid line across
+        the front top edge and an X on the top face.
+        '''
+
+        lineWidthForDrawing = 2
+
+        # draw front
+        DrawLine(points[0], points[1], color, lineWidthForDrawing)
+        DrawLine(points[1], points[2], color, lineWidthForDrawing)
+        DrawLine(points[3], points[2], color, lineWidthForDrawing)
+        DrawLine(points[3], points[0], color, lineWidthForDrawing)
+
+        # draw back
+        DrawLine(points[4], points[5], color, lineWidthForDrawing)
+        DrawLine(points[6], points[5], color, lineWidthForDrawing)
+        DrawLine(points[6], points[7], color, lineWidthForDrawing)
+        DrawLine(points[4], points[7], color, lineWidthForDrawing)
+
+        # draw sides
+        DrawLine(points[0], points[4], color, lineWidthForDrawing)
+        DrawLine(points[7], points[3], color, lineWidthForDrawing)
+        DrawLine(points[5], points[1], color, lineWidthForDrawing)
+        DrawLine(points[2], points[6], color, lineWidthForDrawing)
+
+        # draw dots
+        DrawDot(points[0], pointColor=color, pointRadius=4)
+        DrawDot(points[1], pointColor=color, pointRadius=4)
+
+        # draw x on the top
+        DrawLine(points[0], points[5], color, lineWidthForDrawing)
+        DrawLine(points[1], points[4], color, lineWidthForDrawing)
+
+    global g_img
+    global g_draw
+    g_draw = ImageDraw.Draw(img)
+    DrawCube(vertices_xy)
+    return img
+
 
 if __name__ == "__main__":
+    # test code for selecting keypoints and visualization
+    img = Image.open("/home/cxt/Documents/research/lf_dope/pytorch-segnet/test_for_training/000000.Sub3_3.lf.png")
+    combined_map = np.load("/home/cxt/Documents/research/lf_dope/pytorch-segnet/test_for_training/prediction_0_segout.png.npy")
+    vertices_xy = get_bbox_vertices(combined_map)
+    img = draw_bbox(vertices_xy, img)
+    img.save("bbox_test.png")
+    ###############
+
     data_root = args.data_root
     SAVED_MODEL_PATH = args.model_path
     OUTPUT_DIR = args.output_dir
@@ -127,5 +222,5 @@ if __name__ == "__main__":
         criterion = torch.nn.CrossEntropyLoss()
 
     model.load_state_dict(torch.load(SAVED_MODEL_PATH))
-    
+
     validate()
