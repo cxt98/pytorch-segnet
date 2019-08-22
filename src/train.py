@@ -36,7 +36,7 @@ NUM_KEYPOINTS = 8 + 1  # 8 corners + 1 center
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 1e-5
+LEARNING_RATE = 5e-4
 BATCH_SIZE = 12
 
 
@@ -85,8 +85,8 @@ def train():
             loss.backward()
             optimizer.step()
 
-            if batch_id % 200 == 0:
-                print("Epoch #{}\tBatch #{}\tLoss: {:.8f}".format(epoch + 1, batch_id, loss))
+            if batch_id % 10 == 0:
+                print("Epoch #{}\tBatch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_reg: {:.8f}".format(epoch + 1, batch_id, loss, loss_seg, loss_key))
             loss_f += loss.float()
             prediction_f = seg_tensor.float()
             batch_id = batch_id + 1
@@ -183,4 +183,4 @@ if __name__ == "__main__":
 
     train()
 
-    print('train over')
+    print('train success')

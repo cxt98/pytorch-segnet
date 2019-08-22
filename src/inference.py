@@ -53,7 +53,7 @@ parser.add_argument('--output_dir', required=True)
 
 args = parser.parse_args()
 
-Debug = True
+Debug = False
 targetLabel = 1 # 1 for glass
 
 def validate():
@@ -112,7 +112,8 @@ def validate():
                     plt.show()
                     fig.savefig(os.path.join(OUTPUT_DIR, "prediction_kp_{}_{}.png".format(batch_idx,cornor_idx)))
                     plt.close(fig)
-            np.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout".format(batch_idx)), save_to_npy)
+            if Debug:
+                np.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout".format(batch_idx)), save_to_npy)
 
         if not Debug:
             for idx, predicted_mask in enumerate(xseg_output):
