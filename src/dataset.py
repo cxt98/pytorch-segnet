@@ -53,7 +53,8 @@ class LFDataset(Dataset):
             }
         else:
             data = {
-                'image': torch.FloatTensor(image)
+                'image': torch.FloatTensor(image),
+                # 'keypoints_2d': torch.FloatTensor(json_info['keypoints_2d'])
             }
 
         return data
@@ -114,6 +115,7 @@ class LFDataset(Dataset):
             "bbox": pointsBoxes,
             "keypoints_2d": points_keypoints_2d # 8 keypoints + center
         }
+
     def generate_offset_map(self,jsoninfo,mask):
         temp_mask = np.copy(mask)
         img_size = mask.shape
@@ -147,15 +149,15 @@ class LFDataset(Dataset):
                     x_mask[:, :, kp] = x_mask[:, :, kp] + np.multiply(keypoint2d[kp][0] * current_instance_mask.astype(int),
                                                                       (x_mask[:, :, kp] == 0).astype(int))
 
-                    y_mask[:, :, kp] = y_mask[:, :, kp] + np.multiply(keypoint2d[kp][0] * current_instance_mask.astype(int),
+                    y_mask[:, :, kp] = y_mask[:, :, kp] + np.multiply(keypoint2d[kp][1] * current_instance_mask.astype(int),
                                                                         (y_mask[:, :, kp] == 0).astype(int))
 
         x_offset = (x_offset - x_mask) / img_size[1]
         y_offset = (y_offset - y_mask) / img_size[0]
 
-        # self.save_offset_mask_to_img("/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/segmentation/test",x_offset,"x")
+        # self.save_offset_mask_to_img("/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/test",x_offset,"x")
         # self.save_offset_mask_to_img(
-        #     "/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/segmentation/test", y_offset,
+        #     "/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/test", y_offset,
         #     "y")
         return np.transpose(np.concatenate((x_offset,y_offset),axis=2), (2, 0, 1))
 
@@ -206,6 +208,8 @@ class LFDataset(Dataset):
         else:
             for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
                 self.images.append(imgpath)
+                # jsonpath = imgpath.replace("lf.png", "json") # only for training data debug useage
+                # self.jsonfile.append(jsonpath) # only for training data debug useage
 
     def findallimg_train(self, path):
         if not os.path.isdir(path):

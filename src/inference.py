@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from model import SegNet
 import numpy as np
 import os
-from PIL import Image
+from PIL import Image, ImageDraw
 import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
@@ -53,8 +53,13 @@ parser.add_argument('--output_dir', required=True)
 
 args = parser.parse_args()
 
+g_img = None
+g_draw = None
+
 Debug = False
 targetLabel = 1 # 1 for glass
+
+colorcodes = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w', 'b']
 
 def validate():
     model.eval()
@@ -62,9 +67,8 @@ def validate():
     for batch_idx, batch in enumerate(val_dataloader):
         input_tensor = torch.autograd.Variable(batch['image'])
 
-        # if CUDA:
-        #     input_tensor = input_tensor.cuda()
-        #     target_tensor = target_tensor.cuda()
+        # gt_kp = batch['keypoints_2d'].data.cpu().numpy() ########### Only for debug use, plot the gt against estimation
+
 
         xseg_output, xkey_output = model(input_tensor)
         # loss = criterion(predicted_tensor, target_tensor)
@@ -84,36 +88,55 @@ def validate():
             predicted_kpX = x_offsetmask.transpose(2,0,1) - predicted_kps[0:9, :, :] * img_size[1]
             predicted_kpY = y_offsetmask.transpose(2,0,1) - predicted_kps[9:18, :, :] * img_size[0]
             predicted_conf = predicted_kps[18::, :, :]
-            for cornor_idx in range(predicted_kpX.shape[0]):
+
+            for corner_idx in range(predicted_kpX.shape[0]):
                 if Debug:
-                    kpX = predicted_kpX[cornor_idx, :, :]
-                    kpY = predicted_kpY[cornor_idx, :, :]
-                    kpC = predicted_conf[cornor_idx, :, :]
-                    kpX[seg_mask == targetLabel] = 0
-                    kpY[seg_mask == targetLabel] = 0
-                    kpC[seg_mask == targetLabel] = 0
-                    save_to_npy[:, :, :, cornor_idx] = np.dstack((kpX,kpY,kpC))
+                    kpX = predicted_kpX[corner_idx, :, :]
+                    kpY = predicted_kpY[corner_idx, :, :]
+                    kpC = predicted_conf[corner_idx, :, :]
+                    kpX[seg_mask != targetLabel] = 0
+                    kpY[seg_mask != targetLabel] = 0
+                    kpC[seg_mask != targetLabel] = 0
+                    save_to_npy[:, :, :, corner_idx] = np.dstack((kpX,kpY,kpC))
 
                 else:
-                    kpX = predicted_kpX[cornor_idx, seg_mask == targetLabel]
-                    kpY = predicted_kpY[cornor_idx, seg_mask == targetLabel]
-                    kpX = np.reshape(kpX, (1,-1))
-                    kpY = np.reshape(kpY, (1,-1))
+                    fig = plt.figure()
+                    plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
+                    kpX = predicted_kpX[corner_idx, seg_mask == targetLabel]
+                    kpY = predicted_kpY[corner_idx, seg_mask == targetLabel]
+                    kpC = predicted_conf[corner_idx, seg_mask == targetLabel]
+                    kpX = np.reshape(kpX, (1, -1))
+                    kpY = np.reshape(kpY, (1, -1))
+                    kpC = np.reshape(kpC, (1, -1))
                     invalid_mask = np.logical_and(np.logical_and(kpX >= 0, kpX <= img_size[1]),
                                                   np.logical_and(kpY >= 0, kpY <= img_size[0]))
                     kpX = np.ma.MaskedArray(kpX, mask=~invalid_mask)
                     kpY = np.ma.MaskedArray(kpY, mask=~invalid_mask)
+                    kpC = np.ma.MaskedArray(kpC, mask=~invalid_mask)
                     kpX = np.ma.compress_cols(kpX)
                     kpY = np.ma.compress_cols(kpY)
+                    kpC = np.ma.compress_cols(kpC)
+                    topN = 100
+                    kp = np.hstack((np.transpose(kpX), np.transpose(kpY), np.transpose(kpC)))
+                    kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)[:topN]
+                    kpX_topN = [a[0] for a in kp_topN]
+                    kpY_topN = [a[1] for a in kp_topN]
 
-                    fig = plt.figure()
-                    plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
-                    plt.scatter(x=kpX, y=kpY, c='b', s=0.1)
+                    plt.plot(kpX_topN, kpY_topN, colorcodes[corner_idx] + 'o')
                     plt.show()
-                    fig.savefig(os.path.join(OUTPUT_DIR, "prediction_kp_{}_{}.png".format(batch_idx,cornor_idx)))
-                    plt.close(fig)
-            if Debug:
-                np.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout".format(batch_idx)), save_to_npy)
+                    ########### Only for debug use, plot the gt against estimation
+                    # for cup_number in range(gt_kp.shape[1]):
+                    #     plt.plot(gt_kp[0,cup_number,corner_idx,0], gt_kp[0,cup_number,corner_idx,1],
+                    #              'rx', linewidth = 4,markersize = 10)
+                    #     plt.show()
+                    #
+                    # fig.savefig(os.path.join(OUTPUT_DIR, "prediction_kp_{}_{}_all.png".format(batch_idx,corner_idx)))
+                    # plt.close(fig)
+            # if Debug:
+            #     np.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout".format(batch_idx)), save_to_npy)
+            # vertices_xy = get_bbox_vertices(save_to_npy)
+            # img = draw_bbox(vertices_xy, input_image[:, 13].transpose(0, 2).transpose(0, 1))
+            # img.save(os.path.join(OUTPUT_DIR, "prediction_bbox_{}.png".format(batch_idx)))
 
         if not Debug:
             for idx, predicted_mask in enumerate(xseg_output):
@@ -147,8 +170,101 @@ def validate():
 
 
 
+            # processes to save 4d output "combined_map", "img" should be original image
+
+            # vertices_xy = get_bbox_vertices(combined_map)
+            # img = draw_bbox(vertices_xy, input_image[:,13])
+            # img.save("bbox_{}.png".format(batch_idx))
+
+
+def get_bbox_vertices(combined_map):
+    # combined map format: width(224) * height(224) * 3(offset_x, offset_y, conf) * nKeypoints(9)
+    # use weighted mean of top N estimates with highest confidence
+    topN = 100
+    row, col = np.nonzero(combined_map[:, :, 0, 0])
+    vertices_xy = []
+    for i in range(combined_map.shape[-1]):
+        vertices_candidate = np.transpose(np.vstack((combined_map[row, col, 0, i] + row, combined_map[row, col, 1, i] + col, combined_map[row, col, 2, i])))
+        sorted_candidate = sorted(vertices_candidate, key=lambda entry: entry[-1], reverse=True)
+        vertices_xy.append((np.average(sorted_candidate[:topN][0], weights=sorted_candidate[:topN][-1]),
+                           np.average(sorted_candidate[:topN][1], weights=sorted_candidate[:topN][-1])))
+    return vertices_xy
+
+
+def draw_bbox(vertices_xy, img_np, color=(255, 0, 0)):
+
+    def DrawLine(point1, point2, lineColor, lineWidth):
+        '''Draws line on image'''
+        global g_draw
+        if not point1 is None and point2 is not None:
+            g_draw.line([point1, point2], fill=lineColor, width=lineWidth)
+
+    def DrawDot(point, pointColor, pointRadius):
+        '''Draws dot (filled circle) on image'''
+        global g_draw
+        if point is not None:
+            xy = [
+                point[0] - pointRadius,
+                point[1] - pointRadius,
+                point[0] + pointRadius,
+                point[1] + pointRadius
+            ]
+            g_draw.ellipse(xy,
+                           fill=pointColor,
+                           outline=pointColor
+                           )
+
+    def DrawCube(points, color=(255, 0, 0)):
+        '''
+        Draws cube with a thick solid line across
+        the front top edge and an X on the top face.
+        '''
+
+        lineWidthForDrawing = 2
+
+        # draw front
+        DrawLine(points[0], points[1], color, lineWidthForDrawing)
+        DrawLine(points[1], points[2], color, lineWidthForDrawing)
+        DrawLine(points[3], points[2], color, lineWidthForDrawing)
+        DrawLine(points[3], points[0], color, lineWidthForDrawing)
+
+        # draw back
+        DrawLine(points[4], points[5], color, lineWidthForDrawing)
+        DrawLine(points[6], points[5], color, lineWidthForDrawing)
+        DrawLine(points[6], points[7], color, lineWidthForDrawing)
+        DrawLine(points[4], points[7], color, lineWidthForDrawing)
+
+        # draw sides
+        DrawLine(points[0], points[4], color, lineWidthForDrawing)
+        DrawLine(points[7], points[3], color, lineWidthForDrawing)
+        DrawLine(points[5], points[1], color, lineWidthForDrawing)
+        DrawLine(points[2], points[6], color, lineWidthForDrawing)
+
+        # draw dots
+        DrawDot(points[0], pointColor=color, pointRadius=4)
+        DrawDot(points[1], pointColor=color, pointRadius=4)
+
+        # draw x on the top
+        DrawLine(points[0], points[5], color, lineWidthForDrawing)
+        DrawLine(points[1], points[4], color, lineWidthForDrawing)
+
+    global g_img
+    global g_draw
+    img = Image.fromarray((img_np.numpy() * 255).astype('uint8'))
+    g_draw = ImageDraw.Draw(img)
+    DrawCube(vertices_xy)
+    return img
+
 
 if __name__ == "__main__":
+    # test code for selecting keypoints and visualization
+    # img = Image.open("/home/cxt/Documents/research/lf_dope/pytorch-segnet/test_for_training/000000.Sub3_3.lf.png")
+    # combined_map = np.load("/home/cxt/Documents/research/lf_dope/pytorch-segnet/test_for_training/prediction_0_segout.png.npy")
+    # vertices_xy = get_bbox_vertices(combined_map)
+    # img = draw_bbox(vertices_xy, img)
+    # img.save("bbox_test.png")
+    ###############
+
     data_root = args.data_root
     SAVED_MODEL_PATH = args.model_path
     OUTPUT_DIR = args.output_dir
@@ -178,5 +294,5 @@ if __name__ == "__main__":
         criterion = torch.nn.CrossEntropyLoss()
 
     model.load_state_dict(torch.load(SAVED_MODEL_PATH))
-    
+
     validate()
