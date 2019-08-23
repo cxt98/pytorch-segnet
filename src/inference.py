@@ -57,10 +57,7 @@ args = parser.parse_args()
 g_img = None
 g_draw = None
 
-<<<<<<< HEAD
-Debug = False
-targetLabel = 1 # 1 for glass
-=======
+
 Debug = True
 targetLabel = 1  # 1 for glass
 
@@ -82,7 +79,7 @@ wine_3d_points = [
     [-ww_half, -ww_half, -wh_half],
     [ww_half, -ww_half, -wh_half]
 ]
->>>>>>> 0eab97a173b45b54433ddf12bdf1396a765e7b1b
+
 
 colorcodes = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w', 'b']
 
