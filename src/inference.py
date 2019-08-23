@@ -16,7 +16,6 @@ python ./src/inference.py --data_root /home/cxt/Documents/research/lf_dope/lf_tr
 
 """
 
-
 from __future__ import print_function
 import argparse
 from dataset import LFDataset, NUM_CLASSES
@@ -28,17 +27,19 @@ from PIL import Image, ImageDraw
 import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
+import cv2
+from scipy.spatial.transform import Rotation as R
+import point_cloud_utils as pcu
+
 
 plt.switch_backend('agg')
 plt.axis('off')
-
 
 # Constants
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1
 
 BATCH_SIZE = 1
-
 
 # Arguments
 parser = argparse.ArgumentParser(description='Validate a SegNet model')
@@ -57,7 +58,26 @@ g_img = None
 g_draw = None
 
 Debug = True
-targetLabel = 1 # 1 for glass
+targetLabel = 1  # 1 for glass
+
+camera_intrinsic = [
+    [1000, 0, 1000],
+    [0, 1000, 1000],
+    [0, 0, 1]
+]
+# "cuboid_dimensions": [ 8.5599002838134766, 17.851900100708008, 8.5599002838134766 ]
+wh_half, ww_half = 17.851900100708008 / 2, 8.5599002838134766 / 2
+#  up_front_right, up_back_right, down_back_right, down_front_right, up_front_left, up_back_left, down_back_left, down_front_left
+wine_3d_points = [
+    [ww_half, ww_half, wh_half],
+    [-ww_half, ww_half, wh_half],
+    [-ww_half, ww_half, -wh_half],
+    [ww_half, ww_half, -wh_half],
+    [ww_half, -ww_half, wh_half],
+    [-ww_half, -ww_half, wh_half],
+    [-ww_half, -ww_half, -wh_half],
+    [ww_half, -ww_half, -wh_half]
+]
 
 def validate():
     model.eval()
@@ -71,21 +91,21 @@ def validate():
 
         xseg_output, xkey_output = model(input_tensor)
         # loss = criterion(predicted_tensor, target_tensor)
-        img_size = (xkey_output.shape[2],xkey_output.shape[3])
-        x_offsetmask = np.tile(np.arange(img_size[1]),(img_size[0],1))
-        y_offsetmask = np.transpose(np.tile(np.arange(img_size[0]),(img_size[1],1)))
+        img_size = (xkey_output.shape[2], xkey_output.shape[3])
+        x_offsetmask = np.tile(np.arange(img_size[1]), (img_size[0], 1))
+        y_offsetmask = np.transpose(np.tile(np.arange(img_size[0]), (img_size[1], 1)))
         x_offsetmask = np.repeat(x_offsetmask[:, :, np.newaxis], 9, axis=2)
         y_offsetmask = np.repeat(y_offsetmask[:, :, np.newaxis], 9, axis=2)
 
         for idx, predicted_keypoints in enumerate(xkey_output):
-            save_to_npy = np.zeros([img_size[0],img_size[1],3,9])
+            save_to_npy = np.zeros([img_size[0], img_size[1], 3, 9])
             input_image = input_tensor[idx]
             seg_mask = xseg_output[idx].data.cpu().numpy()
             seg_mask = seg_mask.argmax(axis=0)
             predicted_keypoints = torch.squeeze(predicted_keypoints)
             predicted_kps = predicted_keypoints.data.cpu().numpy()
-            predicted_kpX = x_offsetmask.transpose(2,0,1) - predicted_kps[0:9, :, :] * img_size[1]
-            predicted_kpY = y_offsetmask.transpose(2,0,1) - predicted_kps[9:18, :, :] * img_size[0]
+            predicted_kpX = x_offsetmask.transpose(2, 0, 1) - predicted_kps[0:9, :, :] * img_size[1]
+            predicted_kpY = y_offsetmask.transpose(2, 0, 1) - predicted_kps[9:18, :, :] * img_size[0]
             predicted_conf = predicted_kps[18::, :, :]
             for cornor_idx in range(predicted_kpX.shape[0]):
                 if Debug:
@@ -95,13 +115,13 @@ def validate():
                     kpX[seg_mask == targetLabel] = 0
                     kpY[seg_mask == targetLabel] = 0
                     kpC[seg_mask == targetLabel] = 0
-                    save_to_npy[:, :, :, cornor_idx] = np.dstack((kpX,kpY,kpC))
+                    save_to_npy[:, :, :, cornor_idx] = np.dstack((kpX, kpY, kpC))
 
                 else:
                     kpX = predicted_kpX[cornor_idx, seg_mask == targetLabel]
                     kpY = predicted_kpY[cornor_idx, seg_mask == targetLabel]
-                    kpX = np.reshape(kpX, (1,-1))
-                    kpY = np.reshape(kpY, (1,-1))
+                    kpX = np.reshape(kpX, (1, -1))
+                    kpY = np.reshape(kpY, (1, -1))
                     invalid_mask = np.logical_and(np.logical_and(kpX >= 0, kpX <= img_size[1]),
                                                   np.logical_and(kpY >= 0, kpY <= img_size[0]))
                     kpX = np.ma.MaskedArray(kpX, mask=~invalid_mask)
@@ -113,7 +133,7 @@ def validate():
                     plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
                     plt.scatter(x=kpX, y=kpY, c='b', s=0.1)
                     plt.show()
-                    fig.savefig(os.path.join(OUTPUT_DIR, "prediction_kp_{}_{}.png".format(batch_idx,cornor_idx)))
+                    fig.savefig(os.path.join(OUTPUT_DIR, "prediction_kp_{}_{}.png".format(batch_idx, cornor_idx)))
                     plt.close(fig)
             np.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout".format(batch_idx)), save_to_npy)
 
@@ -123,11 +143,11 @@ def validate():
 
                 fig = plt.figure()
 
-                a = fig.add_subplot(1,2,1)
-                plt.imshow(input_image[:,13].transpose(0, 2).transpose(0, 1)) # extract CenterView from 3D LF input
+                a = fig.add_subplot(1, 2, 1)
+                plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))  # extract CenterView from 3D LF input
                 a.set_title('Input Image')
 
-                a = fig.add_subplot(1,2,2)
+                a = fig.add_subplot(1, 2, 2)
                 predicted_mx = predicted_mask.data.cpu().numpy()
                 predicted_mx = predicted_mx.argmax(axis=0)
                 # for display
@@ -146,9 +166,6 @@ def validate():
                 print("Predicted {}th frame".format(batch_idx))
                 plt.close(fig)
 
-
-
-
             # processes to save 4d output "combined_map", "img" should be original image
 
             # vertices_xy = get_bbox_vertices(combined_map)
@@ -163,15 +180,15 @@ def get_bbox_vertices(combined_map):
     row, col = np.nonzero(combined_map[:, :, 0, 0])
     vertices_xy = []
     for i in range(combined_map.shape[-1]):
-        vertices_candidate = np.transpose(np.vstack((combined_map[row, col, 0, i] + row, combined_map[row, col, 1, i] + col, combined_map[row, col, 2, i])))
+        vertices_candidate = np.transpose(np.vstack(
+            (combined_map[row, col, 0, i] + row, combined_map[row, col, 1, i] + col, combined_map[row, col, 2, i])))
         sorted_candidate = sorted(vertices_candidate, key=lambda entry: entry[-1], reverse=True)
         vertices_xy.append((np.average(sorted_candidate[0][:topN], weights=sorted_candidate[-1][:topN]),
-                           np.average(sorted_candidate[1][:topN], weights=sorted_candidate[-1][:topN])))
+                            np.average(sorted_candidate[1][:topN], weights=sorted_candidate[-1][:topN])))
     return vertices_xy
 
 
 def draw_bbox(vertices_xy, img, color=(255, 0, 0)):
-
     def DrawLine(point1, point2, lineColor, lineWidth):
         '''Draws line on image'''
         global g_draw
@@ -234,13 +251,65 @@ def draw_bbox(vertices_xy, img, color=(255, 0, 0)):
     return img
 
 
+def solve_pnp(obj_3d_points, obj_2d_points):
+    (major, _, _) = cv2.__version__.split(".")
+    pnp_algorithm = cv2.CV_ITERATIVE if major == 2 else cv2.SOLVEPNP_ITERATIVE
+    dist_coeffs = np.zeros((4, 1))
+    ret, rvec, tvec = cv2.solvePnP(obj_3d_points, obj_2d_points, camera_intrinsic, dist_coeffs, pnp_algorithm)
+
+    location = None
+    quaternion = None
+    if ret:
+        location = list(x[0] for x in tvec)
+        r = R.from_rotvec(rvec)
+        quaternion = r.as_quat()
+
+        projected_points, _ = cv2.projectPoints(obj_3d_points, rvec, tvec, camera_intrinsic, dist_coeffs)
+        projected_points = np.squeeze(projected_points)
+
+        # If the location.Z is negative or object is behind the camera then flip both location and rotation
+        x, y, z = location
+        if z < 0:
+            location = [-x, -y, -z]
+            rotation_matrix = r.as_dcm()
+            quaternion = R.from_dcm(-rotation_matrix).as_quat()
+
+    return location, quaternion
+
+
+def project2d(obj_points, location, quaternion):
+    rotation_matrix = R.from_quat(quaternion).as_dcm()
+    obj_points_transform = rotation_matrix * obj_points + np.array(location)
+    obj_points_unitdepth = np.divide(obj_points_transform, obj_points_transform[-1])
+    obj_coordinates = camera_intrinsic * obj_points_unitdepth
+    return obj_coordinates[:2]
+
+
+def ADD_S(points_1, points_2):
+    # point_cloud_utils version
+    dists_a_to_b, _ = pcu.point_cloud_distance(points_1, points_2)
+    return np.mean(dists_a_to_b)
+
+    # python basic version
+    # def closest_node(node, nodes):
+    #     nodes = np.asarray(nodes)
+    #     deltas = nodes - node
+    #     dist_2 = np.einsum('ij,ij->i', deltas, deltas)
+    #     return np.argmin(dist_2)
+    #
+    # return np.mean([closest_node(point, points_2) for point in points_1])
+
+
+
 if __name__ == "__main__":
     # test code for selecting keypoints and visualization
     img = Image.open("/home/cxt/Documents/research/lf_dope/pytorch-segnet/test_for_training/000000.Sub3_3.lf.png")
-    combined_map = np.load("/home/cxt/Documents/research/lf_dope/pytorch-segnet/test_for_training/prediction_0_segout.png.npy")
+    combined_map = np.load(
+        "/home/cxt/Documents/research/lf_dope/pytorch-segnet/test_for_training/prediction_0_segout.png.npy")
     vertices_xy = get_bbox_vertices(combined_map)
     img = draw_bbox(vertices_xy, img)
     img.save("bbox_test.png")
+    location, quaternion = solve_pnp(wine_3d_points, vertices_xy[:8])
     ###############
 
     data_root = args.data_root
@@ -248,7 +317,7 @@ if __name__ == "__main__":
     OUTPUT_DIR = args.output_dir
 
     CUDA = 1
-    GPU_ID = [0,1]
+    GPU_ID = [0, 1]
 
     val_dataset = LFDataset(root_path=data_root, validation=True)
 
@@ -256,7 +325,6 @@ if __name__ == "__main__":
                                 batch_size=BATCH_SIZE,
                                 shuffle=False,
                                 num_workers=4)
-
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
