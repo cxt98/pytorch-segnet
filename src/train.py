@@ -32,11 +32,11 @@ import torch.nn as nn
 # Constants
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1  # boundary around object
-NUM_KEYPOINTS = 8 + 1  # 8 corners + 1 center
+NUM_KEYPOINTS = 2 + 1  # 8 corners + 1 center or 2 major points + 1 center
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-4
 BATCH_SIZE = 12
 
 
@@ -64,6 +64,8 @@ def train():
     print ("Batch Number:" + str(len(train_dataloader)))
     for epoch in range(NUM_EPOCHS):
         loss_f = 0
+        loss_seg_f = 0
+        loss_reg_f = 0
         t_start = time.time()
         batch_id = 0
         for batch in train_dataloader:
@@ -85,13 +87,17 @@ def train():
             loss.backward()
             optimizer.step()
 
-            if batch_id % 10 == 0:
+            if batch_id % 100 == 0:
                 print("Epoch #{}\tBatch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_reg: {:.8f}".format(epoch + 1, batch_id, loss, loss_seg, loss_key))
             loss_f += loss.float()
+            loss_seg_f += loss_seg.float()
+            loss_reg_f += loss_key.float()
             prediction_f = seg_tensor.float()
             batch_id = batch_id + 1
 
         loss_f = loss_f / len(train_dataloader)
+        loss_seg_f = loss_seg_f / len(train_dataloader)
+        loss_reg_f = loss_reg_f / len(train_dataloader)
         delta = time.time() - t_start
         is_better = loss_f < prev_loss
 
@@ -102,7 +108,7 @@ def train():
         if epoch % 10 == 0:
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
             print("saved new best model")
-        print("Epoch #{}\tLoss: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, delta))
+        print("Epoch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_reg: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, loss_seg_f, loss_reg_f, delta))
 
 
 def calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor):
@@ -124,6 +130,10 @@ def calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor):
     key_target_tensor = key_target_tensor.transpose(dim0=0, dim1=1).contiguous().view(2 * nKeypoints, nBatch * nWidth * nHeight)
 
     roi_ind = seg_target_tensor.nonzero().squeeze()
+
+    if roi_ind.size(0) == 0:  # no segmentation estimation output
+        return torch.tensor(0.0).cuda()
+
     key_tensor = key_tensor.index_select(dim=1, index=roi_ind)
     xy_gt = key_target_tensor.index_select(dim=1, index=roi_ind)
 

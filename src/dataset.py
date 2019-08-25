@@ -29,7 +29,8 @@ class LFDataset(Dataset):
         self.img_size = 224
         self.edgemap = edgemap
         self.root_path = root_path
-
+        self.intriscM = np.matrix([[112, 0.0, 112.0],[0.0, 112, 112.0],[0.0, 0.0, 1.0]])
+        self.num_kpts = 3
         if self.validation:
             self.findallimg_validate(self.root_path)
         else:
@@ -45,16 +46,21 @@ class LFDataset(Dataset):
         if not self.validation:
             gt_mask = self.load_mask(path=self.masks[index])
             json_info = self.loadjson(path=self.jsonfile[index])
-            gt_offset = self.generate_offset_map(jsoninfo=json_info, mask=gt_mask)
+            gt_offset = self.generate_offset_map(jsoninfo=json_info, mask=gt_mask, simplfied=True)
             data = {
                 'image': torch.FloatTensor(image),
                 'mask': torch.LongTensor(gt_mask),
                 'gt_offset': torch.FloatTensor(gt_offset)
             }
         else:
+            # kpts_3d = []
+            # json_info = self.loadjson(path=self.jsonfile[index]) # debug agasint gt key points
+            # for i in range(len(json_info['keypoints_3d'])):
+            #     kpts_3d.append(self.get_3d_3pts(json_info['keypoints_3d'][i]))
             data = {
                 'image': torch.FloatTensor(image),
-                # 'keypoints_2d': torch.FloatTensor(json_info['keypoints_2d'])
+                # 'keypoints_2d': torch.FloatTensor(json_info['keypoints_2d']) # debug agasint gt key points
+                # 'keypoints_2d': torch.FloatTensor(kpts_3d)
             }
 
         return data
@@ -69,6 +75,7 @@ class LFDataset(Dataset):
         # print (path)
 
         points_keypoints_2d = []
+        points_keypoints_3d = []
         pointsBoxes = []
         boxes = []
         class_name = []
@@ -110,13 +117,26 @@ class LFDataset(Dataset):
             point2dToAdd.append((pcenter[0], pcenter[1]))
             points_keypoints_2d.append(point2dToAdd)
 
+            # 2d projected key points
+            point3dToAdd = []
+            pointdata = info['cuboid']
+            for p in pointdata:
+                point3dToAdd.append((p[0], p[1], p[2]))  # change x,y index to row,col index
+
+            # Get the centroids
+            pcenter = info['cuboid_centroid']
+
+            point3dToAdd.append((pcenter[0], pcenter[1],pcenter[2]))
+            points_keypoints_3d.append(point3dToAdd)
+
         return {
             "class": class_name,
             "bbox": pointsBoxes,
-            "keypoints_2d": points_keypoints_2d # 8 keypoints + center
+            "keypoints_2d": points_keypoints_2d, # 8 keypoints + center
+            "keypoints_3d": points_keypoints_3d # 8 keypoints + center
         }
 
-    def generate_offset_map(self,jsoninfo,mask):
+    def generate_offset_map(self, jsoninfo, mask, simplfied=False):
         temp_mask = np.copy(mask)
         img_size = mask.shape
         temp_mask[temp_mask == NUM_CLASSES] = 0  # edge to background
@@ -125,20 +145,23 @@ class LFDataset(Dataset):
         y_offset = np.transpose(np.copy(x_offset))
         x_offset[temp_mask==0] = 0
         y_offset[temp_mask==0] = 0
-        x_offset = np.repeat(x_offset[:, :, np.newaxis], 9, axis=2)
-        y_offset = np.repeat(y_offset[:, :, np.newaxis], 9, axis=2)
-        x_mask = np.zeros([img_size[0], img_size[1], 9])
-        y_mask = np.zeros([img_size[0], img_size[1], 9])
+        x_offset = np.repeat(x_offset[:, :, np.newaxis], self.num_kpts, axis=2)
+        y_offset = np.repeat(y_offset[:, :, np.newaxis], self.num_kpts, axis=2)
+        x_mask = np.zeros([img_size[0], img_size[1], self.num_kpts])
+        y_mask = np.zeros([img_size[0], img_size[1], self.num_kpts])
         for idx in range(len(jsoninfo['class'])):
             class_name = jsoninfo['class'][idx]
             bbox = jsoninfo['bbox'][idx]
-            keypoint2d = jsoninfo['keypoints_2d'][idx]
+            if simplfied:
+                keypoint2d = self.get_3d_3pts(jsoninfo['keypoints_3d'][idx])
+            else:
+                keypoint2d = jsoninfo['keypoints_2d'][idx]
             target_label = LF_CLASSES[class_name]
             current_instance_mask = np.full(img_size,False)
-            bbox_rowindex = (self.boundray_check(bbox[0][1], 0, img_size[0]),
-                             self.boundray_check(bbox[2][1], 0, img_size[0]))
-            bbox_colindex = (self.boundray_check(bbox[0][0], 0, img_size[1]),
-                             self.boundray_check(bbox[1][0], 0, img_size[1]))
+            bbox_rowindex = (self.boundary_check(bbox[0][1], 0, img_size[0]),
+                             self.boundary_check(bbox[2][1], 0, img_size[0]))
+            bbox_colindex = (self.boundary_check(bbox[0][0], 0, img_size[1]),
+                             self.boundary_check(bbox[1][0], 0, img_size[1]))
             if bbox_rowindex[0] == bbox_rowindex[1] or bbox_colindex[0] == bbox_colindex[1]:
                 continue
             else:
@@ -157,18 +180,37 @@ class LFDataset(Dataset):
 
         # self.save_offset_mask_to_img("/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/test",x_offset,"x")
         # self.save_offset_mask_to_img(
-        #     "/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/test", y_offset,
-        #     "y")
+        #     "/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/test", y_offset, "y")
         return np.transpose(np.concatenate((x_offset,y_offset),axis=2), (2, 0, 1))
 
+    def get_3d_3pts(self, json_indexed_kps3D):
+        selected_pts = []
+        keypoint3d = json_indexed_kps3D
+        selected_pts.append(((keypoint3d[0][0] + keypoint3d[1][0] + keypoint3d[4][0] + keypoint3d[5][0]) / 4.0,
+                             (keypoint3d[0][1] + keypoint3d[1][1] + keypoint3d[4][1] + keypoint3d[5][1]) / 4.0,
+                             (keypoint3d[0][2] + keypoint3d[1][2] + keypoint3d[4][2] + keypoint3d[5][2]) / 4.0))
+        selected_pts.append(((keypoint3d[2][0] + keypoint3d[3][0] + keypoint3d[6][0] + keypoint3d[7][0]) / 4.0,
+                             (keypoint3d[2][1] + keypoint3d[3][1] + keypoint3d[6][1] + keypoint3d[7][1]) / 4.0,
+                             (keypoint3d[2][2] + keypoint3d[3][2] + keypoint3d[6][2] + keypoint3d[7][2]) / 4.0))
+        selected_pts.append((keypoint3d[8][0], keypoint3d[8][1], keypoint3d[8][2]))
 
-    def save_offset_mask_to_img(self,path, mask,save_prefix):
+        return self.project_3d_to_2d(selected_pts)
+
+    def project_3d_to_2d(self, pts_array):
+        pts_2d = []
+        for pts in pts_array:
+            nor_pts = np.transpose(np.matrix([pts[0]/pts[2], pts[1]/pts[2], 1.0]))
+            result = self.intriscM * nor_pts
+            pts_2d.append((result[0,0],result[1,0]))
+        return pts_2d
+
+    def save_offset_mask_to_img(self,path, mask, save_prefix):
         for i in range(mask.shape[2]):
             mask[:,:,i] = (mask[:,:,i] - mask.min()) / (mask.max() - mask.min())
             im = Image.fromarray(np.uint8(mask[:,:,i]*255))
             im.save(os.path.join(path,"{}_offsetmap_{}.png".format(save_prefix,i)))
 
-    def boundray_check(self,value,min,max):
+    def boundary_check(self, value, min, max):
 
         value = int(round(min)) if value < int(round(min)) else int(round(value))
         value = int(round(max)) if value > int(round(max)) else int(round(value))
@@ -208,8 +250,8 @@ class LFDataset(Dataset):
         else:
             for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
                 self.images.append(imgpath)
-                # jsonpath = imgpath.replace("lf.png", "json") # only for training data debug useage
-                # self.jsonfile.append(jsonpath) # only for training data debug useage
+                # jsonpath = imgpath.replace("lf.png", "json") # debug agasint gt key points
+                # self.jsonfile.append(jsonpath) # debug agasint gt key points
 
     def findallimg_train(self, path):
         if not os.path.isdir(path):

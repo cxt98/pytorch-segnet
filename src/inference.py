@@ -28,8 +28,8 @@ import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import cv2
-from scipy.spatial.transform import Rotation as R
-import point_cloud_utils as pcu
+# from scipy.spatial.transform import Rotation as R
+# import point_cloud_utils as pcu
 
 
 plt.switch_backend('agg')
@@ -38,7 +38,7 @@ plt.axis('off')
 # Constants
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1
-
+NUM_KEYPOINTS = 3
 BATCH_SIZE = 1
 
 # Arguments
@@ -58,7 +58,7 @@ g_img = None
 g_draw = None
 
 
-Debug = True
+
 targetLabel = 1  # 1 for glass
 
 camera_intrinsic = [
@@ -97,63 +97,65 @@ def validate():
         img_size = (xkey_output.shape[2], xkey_output.shape[3])
         x_offsetmask = np.tile(np.arange(img_size[1]), (img_size[0], 1))
         y_offsetmask = np.transpose(np.tile(np.arange(img_size[0]), (img_size[1], 1)))
-        x_offsetmask = np.repeat(x_offsetmask[:, :, np.newaxis], 9, axis=2)
-        y_offsetmask = np.repeat(y_offsetmask[:, :, np.newaxis], 9, axis=2)
+        x_offsetmask = np.repeat(x_offsetmask[:, :, np.newaxis], NUM_KEYPOINTS, axis=2)
+        y_offsetmask = np.repeat(y_offsetmask[:, :, np.newaxis], NUM_KEYPOINTS, axis=2)
 
         for idx, predicted_keypoints in enumerate(xkey_output):
-            save_to_npy = np.zeros([img_size[0], img_size[1], 3, 9])
+            save_to_npy = np.zeros([img_size[0], img_size[1], 3, NUM_KEYPOINTS])
             input_image = input_tensor[idx]
             seg_mask = xseg_output[idx].data.cpu().numpy()
             seg_mask = seg_mask.argmax(axis=0)
             predicted_keypoints = torch.squeeze(predicted_keypoints)
             predicted_kps = predicted_keypoints.data.cpu().numpy()
-            predicted_kpX = x_offsetmask.transpose(2, 0, 1) - predicted_kps[0:9, :, :] * img_size[1]
-            predicted_kpY = y_offsetmask.transpose(2, 0, 1) - predicted_kps[9:18, :, :] * img_size[0]
-            predicted_conf = predicted_kps[18::, :, :]
+            predicted_kpX = x_offsetmask.transpose(2, 0, 1) - predicted_kps[0:NUM_KEYPOINTS, :, :] * img_size[1]
+            predicted_kpY = y_offsetmask.transpose(2, 0, 1) - predicted_kps[NUM_KEYPOINTS:2*NUM_KEYPOINTS, :, :] * img_size[0]
+            predicted_conf = predicted_kps[2*NUM_KEYPOINTS::, :, :]
 
             for corner_idx in range(predicted_kpX.shape[0]):
-                if Debug:
-                    kpX = predicted_kpX[corner_idx, :, :]
-                    kpY = predicted_kpY[corner_idx, :, :]
-                    kpC = predicted_conf[corner_idx, :, :]
-                    kpX[seg_mask != targetLabel] = 0
-                    kpY[seg_mask != targetLabel] = 0
-                    kpC[seg_mask != targetLabel] = 0
-                    save_to_npy[:, :, :, corner_idx] = np.dstack((kpX,kpY,kpC))
+                # if Debug:
+                #     kpX = predicted_kpX[corner_idx, :, :]
+                #     kpY = predicted_kpY[corner_idx, :, :]
+                #     kpC = predicted_conf[corner_idx, :, :]
+                #     kpX[seg_mask != targetLabel] = 0
+                #     kpY[seg_mask != targetLabel] = 0
+                #     kpC[seg_mask != targetLabel] = 0
+                #     save_to_npy[:, :, :, corner_idx] = np.dstack((kpX,kpY,kpC))
+                #
+                # else:
+                fig = plt.figure()
+                plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
+                kpX = predicted_kpX[corner_idx, seg_mask == targetLabel]
+                kpY = predicted_kpY[corner_idx, seg_mask == targetLabel]
+                kpC = predicted_conf[corner_idx, seg_mask == targetLabel]
+                kpX = np.reshape(kpX, (1, -1))
+                kpY = np.reshape(kpY, (1, -1))
+                kpC = np.reshape(kpC, (1, -1))
+                # valid_mask = np.logical_and(np.logical_and(kpX >= 0, kpX <= img_size[1]),
+                #                               np.logical_and(kpY >= 0, kpY <= img_size[0]))
+                valid_mask = np.full(kpX.shape, True)  # don't exclude the points even it is out of bounday
+                kpX = np.ma.MaskedArray(kpX, mask=~valid_mask)
+                kpY = np.ma.MaskedArray(kpY, mask=~valid_mask)
+                kpC = np.ma.MaskedArray(kpC, mask=~valid_mask)
+                kpX = np.ma.compress_cols(kpX)
+                kpY = np.ma.compress_cols(kpY)
+                kpC = np.ma.compress_cols(kpC)
+                topN = 100
+                kp = np.hstack((np.transpose(kpX), np.transpose(kpY), np.transpose(kpC)))
+                kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)[:topN]
+                # kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)
+                kpX_topN = [a[0] for a in kp_topN]
+                kpY_topN = [a[1] for a in kp_topN]
 
-                else:
-                    fig = plt.figure()
-                    plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
-                    kpX = predicted_kpX[corner_idx, seg_mask == targetLabel]
-                    kpY = predicted_kpY[corner_idx, seg_mask == targetLabel]
-                    kpC = predicted_conf[corner_idx, seg_mask == targetLabel]
-                    kpX = np.reshape(kpX, (1, -1))
-                    kpY = np.reshape(kpY, (1, -1))
-                    kpC = np.reshape(kpC, (1, -1))
-                    invalid_mask = np.logical_and(np.logical_and(kpX >= 0, kpX <= img_size[1]),
-                                                  np.logical_and(kpY >= 0, kpY <= img_size[0]))
-                    kpX = np.ma.MaskedArray(kpX, mask=~invalid_mask)
-                    kpY = np.ma.MaskedArray(kpY, mask=~invalid_mask)
-                    kpC = np.ma.MaskedArray(kpC, mask=~invalid_mask)
-                    kpX = np.ma.compress_cols(kpX)
-                    kpY = np.ma.compress_cols(kpY)
-                    kpC = np.ma.compress_cols(kpC)
-                    topN = 100
-                    kp = np.hstack((np.transpose(kpX), np.transpose(kpY), np.transpose(kpC)))
-                    kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)[:topN]
-                    kpX_topN = [a[0] for a in kp_topN]
-                    kpY_topN = [a[1] for a in kp_topN]
+                plt.plot(kpX_topN, kpY_topN, colorcodes[corner_idx] + 'o')
+                plt.show()
+                ########## Only for debug use, plot the gt against estimation
+                # for cup_number in range(gt_kp.shape[1]):
+                #     plt.plot(gt_kp[0,cup_number,corner_idx,0], gt_kp[0,cup_number,corner_idx,1],
+                #              'rx', linewidth = 4,markersize = 10)
+                #     plt.show()
 
-                    plt.plot(kpX_topN, kpY_topN, colorcodes[corner_idx] + 'o')
-                    plt.show()
-                    ########### Only for debug use, plot the gt against estimation
-                    # for cup_number in range(gt_kp.shape[1]):
-                    #     plt.plot(gt_kp[0,cup_number,corner_idx,0], gt_kp[0,cup_number,corner_idx,1],
-                    #              'rx', linewidth = 4,markersize = 10)
-                    #     plt.show()
-                    #
-                    # fig.savefig(os.path.join(OUTPUT_DIR, "prediction_kp_{}_{}_all.png".format(batch_idx,corner_idx)))
-                    # plt.close(fig)
+                fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_kp{}.png".format(batch_idx,corner_idx)))
+                plt.close(fig)
             # if Debug:
             #     np.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout".format(batch_idx)), save_to_npy)
             # vertices_xy = get_bbox_vertices(save_to_npy)
@@ -161,34 +163,36 @@ def validate():
             # img.save(os.path.join(OUTPUT_DIR, "prediction_bbox_{}.png".format(batch_idx)))
 
 
-        if not Debug:
-            for idx, predicted_mask in enumerate(xseg_output):
-                input_image = input_tensor[idx]
 
-                fig = plt.figure()
+        for idx, predicted_mask in enumerate(xseg_output):
+            input_image = input_tensor[idx]
 
-                a = fig.add_subplot(1, 2, 1)
-                plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))  # extract CenterView from 3D LF input
-                a.set_title('Input Image')
+            fig = plt.figure()
 
-                a = fig.add_subplot(1, 2, 2)
-                predicted_mx = predicted_mask.data.cpu().numpy()
-                predicted_mx = predicted_mx.argmax(axis=0)
-                # for display
-                predicted_mx[predicted_mx == 1] = 128
-                predicted_mx[predicted_mx == 2] = 255
-                plt.imshow(predicted_mx)
-                a.set_title('Predicted Mask')
+            a = fig.add_subplot(1, 2, 1)
+            plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))  # extract CenterView from 3D LF input
+            a.set_title('Input Image')
 
-                # a = fig.add_subplot(1,3,3)
-                # target_mx = target_mask.data.cpu().numpy() * 255
-                # Image.fromarray(target_mx.astype(np.uint8)).save(str(idx) + '.png')
-                # plt.imshow(target_mx)
-                # a.set_title('Ground Truth')
+            a = fig.add_subplot(1, 2, 2)
+            predicted_mx = predicted_mask.data.cpu().numpy()
+            predicted_mx = predicted_mx.argmax(axis=0)
+            # for display
+            predicted_mx[predicted_mx == 1] = 128
+            predicted_mx[predicted_mx == 2] = 255
+            plt.imshow(predicted_mx)
+            a.set_title('Predicted Mask')
+            single_mask = Image.fromarray(np.uint8(predicted_mx))
 
-                fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_segout.png".format(batch_idx)))
-                print("Predicted {}th frame".format(batch_idx))
-                plt.close(fig)
+            # a = fig.add_subplot(1,3,3)
+            # target_mx = target_mask.data.cpu().numpy() * 255
+            # Image.fromarray(target_mx.astype(np.uint8)).save(str(idx) + '.png')
+            # plt.imshow(target_mx)
+            # a.set_title('Ground Truth')
+
+            fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_segout.png".format(batch_idx)))
+            single_mask.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout_single.png".format(batch_idx)))
+            print("Predicted {}th frame".format(batch_idx))
+            plt.close(fig)
 
             # processes to save 4d output "combined_map", "img" should be original image
 
@@ -352,7 +356,7 @@ if __name__ == "__main__":
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
-                       output_channels=NUM_OUTPUT_CHANNELS, keypoints=9).cuda()
+                       output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         # class_weights = 1.0 / val_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss().cuda()

@@ -512,7 +512,6 @@ class SegNet(nn.Module):
         return xseg_output, xkey_output
 
 
-
     def init_vgg_weights(self):
         # assert self.encoder_conv_00[0].weight.size() == self.vgg16.features[0].weight.size()
         # self.encoder_conv_00[0].weight.data = self.vgg16.features[0].weight.data
@@ -578,3 +577,4 @@ class SegNet(nn.Module):
         self.encoder_conv_42[0].weight.data = self.vgg16.features[28].weight.data
         assert self.encoder_conv_42[0].bias.size() == self.vgg16.features[28].bias.size()
         self.encoder_conv_42[0].bias.data = self.vgg16.features[28].bias.data
+
