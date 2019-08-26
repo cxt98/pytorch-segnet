@@ -176,6 +176,9 @@ if __name__ == "__main__":
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
+        if args.checkpoint:
+            # model.load_state_dict(torch.load(args.checkpoint))
+            model.load_segonly_state_dict(torch.load(args.checkpoint))
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
@@ -186,8 +189,6 @@ if __name__ == "__main__":
         # class_weights = 1.0/train_dataset.get_class_probability()
         criterion = torch.nn.CrossEntropyLoss()
 
-    if args.checkpoint:
-        model.load_state_dict(torch.load(args.checkpoint))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
