@@ -86,6 +86,7 @@ def validate():
             plt.imshow(predicted_mx)
             a.set_title('Predicted Mask')
 
+            im = Image.fromarray(np.uint8(predicted_mx))
             # a = fig.add_subplot(1,3,3)
             # target_mx = target_mask.data.cpu().numpy() * 255
             # Image.fromarray(target_mx.astype(np.uint8)).save(str(idx) + '.png')
@@ -95,7 +96,7 @@ def validate():
             fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_1.png".format(batch_idx)))
             print("Predicted {}th frame".format(batch_idx))
             plt.close(fig)
-
+            im.save(os.path.join(OUTPUT_DIR, "prediction_{}_seg.png".format(batch_idx)))
 
 if __name__ == "__main__":
     data_root = args.data_root
