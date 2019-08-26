@@ -82,7 +82,7 @@ def train():
 
             optimizer.zero_grad()
             loss_seg = criterion(seg_tensor, seg_target_tensor)
-            loss_key = calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor)
+            loss_key = calculate_keyloss(key_tensor, key_target_tensor, seg_tensor)
             loss = loss_seg + loss_key
             loss.backward()
             optimizer.step()
@@ -177,7 +177,8 @@ if __name__ == "__main__":
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
         if args.checkpoint:
-            # model.load_state_dict(torch.load(args.checkpoint))
+            model.load_state_dict(torch.load(args.checkpoint))
+        elif args.partial_preload:
             model.load_segonly_state_dict(torch.load(args.checkpoint))
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
