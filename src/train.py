@@ -178,7 +178,7 @@ if __name__ == "__main__":
                        output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
         if args.checkpoint:
             model.load_state_dict(torch.load(args.checkpoint))
-        elif args.partial_preload:
+        if args.partial_preload:
             model.load_segonly_state_dict(torch.load(args.checkpoint))
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
