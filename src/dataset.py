@@ -54,12 +54,12 @@ class LFDataset(Dataset):
             }
         else:
             # kpts_3d = []
-            json_info = self.loadjson(path=self.jsonfile[index]) # debug agasint gt key points
+            # json_info = self.loadjson(path=self.jsonfile[index]) # debug agasint gt key points
             # for i in range(len(json_info['keypoints_3d'])):
             #     kpts_3d.append(self.get_3d_3pts(json_info['keypoints_3d'][i]))
             data = {
                 'image': torch.FloatTensor(image),
-                'keypoints_2d': torch.FloatTensor(json_info['keypoints_2d']) # debug agasint gt key points
+                # 'keypoints_2d': torch.FloatTensor(json_info['keypoints_2d']) # debug agasint gt key points
                 # 'keypoints_2d': torch.FloatTensor(kpts_3d)
             }
 
@@ -248,10 +248,10 @@ class LFDataset(Dataset):
             for path_entry in folders:
                 self.findallimg_validate(path_entry)
         else:
-            for imgpath in sorted(glob.glob(path + '/*lf.png')):
+            for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
                 self.images.append(imgpath)
-                jsonpath = imgpath.replace("lf.png", "json") # debug agasint gt key points
-                self.jsonfile.append(jsonpath) # debug agasint gt key points
+                # jsonpath = imgpath.replace("lf.png", "json") # debug agasint gt key points
+                # self.jsonfile.append(jsonpath) # debug agasint gt key points
 
     def findallimg_train(self, path):
         if not os.path.isdir(path):

@@ -28,6 +28,7 @@ import torch
 from torch.utils.data import DataLoader
 import torch.nn.parallel
 import torch.nn as nn
+from torch.optim.lr_scheduler import StepLR
 
 # Constants
 NUM_INPUT_CHANNELS = 3
@@ -36,7 +37,7 @@ NUM_KEYPOINTS = 8 + 1  # 8 corners + 1 center or 2 major points + 1 center
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-3
 BATCH_SIZE = 12
 
 
@@ -64,6 +65,7 @@ def train():
     model.train()
     print ("Batch Number:" + str(len(train_dataloader)))
     for epoch in range(NUM_EPOCHS):
+        scheduler.step()
         loss_f = 0
         loss_seg_f = 0
         loss_reg_f = 0
@@ -89,7 +91,7 @@ def train():
             loss.backward()
             optimizer.step()
 
-            if batch_id % 100 == 0:
+            if batch_id % 10 == 0:
                 print("Epoch #{}\tBatch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_reg: {:.8f}".format(epoch + 1, batch_id, loss, loss_seg, loss_key))
             loss_f += loss.float()
             loss_seg_f += loss_seg.float()
@@ -193,8 +195,9 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(args.checkpoint))
 
     parameters = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = torch.optim.Adam(parameters, lr=LEARNING_RATE)
-
+    # optimizer = torch.optim.Adam(parameters, lr=LEARNING_RATE)
+    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
+    scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
     train()
 
     print('train success')

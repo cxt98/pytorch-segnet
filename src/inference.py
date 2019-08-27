@@ -89,7 +89,7 @@ def validate():
     for batch_idx, batch in enumerate(val_dataloader):
         input_tensor = torch.autograd.Variable(batch['image'])
 
-        gt_kp = batch['keypoints_2d'].data.cpu().numpy() ########### Only for debug use, plot the gt against estimation
+        # gt_kp = batch['keypoints_2d'].data.cpu().numpy() ########### Only for debug use, plot the gt against estimation
 
 
         xseg_output, xkey_output = model(input_tensor)
@@ -139,9 +139,9 @@ def validate():
                 kpX = np.ma.compress_cols(kpX)
                 kpY = np.ma.compress_cols(kpY)
                 kpC = np.ma.compress_cols(kpC)
-                topN = 50
+                topN = 200
                 kp = np.hstack((np.transpose(kpX), np.transpose(kpY), np.transpose(kpC)))
-                kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)[::topN]
+                kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)[:topN]
                 # kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)
                 kpX_topN = [a[0] for a in kp_topN]
                 kpY_topN = [a[1] for a in kp_topN]
@@ -149,10 +149,10 @@ def validate():
                 plt.plot(kpX_topN, kpY_topN, colorcodes[corner_idx] + 'o')
                 plt.show()
                 ######### Only for debug use, plot the gt against estimation
-                for cup_number in range(gt_kp.shape[1]):
-                    plt.plot(gt_kp[0,cup_number,corner_idx,0], gt_kp[0,cup_number,corner_idx,1],
-                             'rx', linewidth = 4,markersize = 10)
-                    plt.show()
+                # for cup_number in range(gt_kp.shape[1]):
+                #     plt.plot(gt_kp[0,cup_number,corner_idx,0], gt_kp[0,cup_number,corner_idx,1],
+                #              'rx', linewidth = 4,markersize = 10)
+                #     plt.show()
 
                 fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_kp{}.png".format(batch_idx,corner_idx)))
                 plt.close(fig)
