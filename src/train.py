@@ -32,12 +32,12 @@ import torch.nn as nn
 # Constants
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1  # boundary around object
-NUM_KEYPOINTS = 2 + 1  # 8 corners + 1 center or 2 major points + 1 center
+NUM_KEYPOINTS = 8 + 1  # 8 corners + 1 center or 2 major points + 1 center
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 1e-4
-BATCH_SIZE = 12
+LEARNING_RATE = 5e-4
+BATCH_SIZE = 1
 
 
 # Arguments
@@ -49,6 +49,7 @@ parser.add_argument('--data_root', required=True)
 # parser.add_argument('--mask_dir', required=True)
 parser.add_argument('--save_dir', required=True)
 parser.add_argument('--checkpoint')
+parser.add_argument('--partial_preload')
 parser.add_argument('--edgemap')
 # parser.add_argument('--gpu', type=int)
 
@@ -82,8 +83,9 @@ def train():
 
             optimizer.zero_grad()
             loss_seg = criterion(seg_tensor, seg_target_tensor)
-            loss_key = calculate_keyloss(key_tensor, key_target_tensor, seg_tensor)
+            loss_key = calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor)
             loss = loss_seg + loss_key
+
             loss.backward()
             optimizer.step()
 
@@ -147,7 +149,7 @@ def calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor):
     conf_pred = key_tensor[2*nKeypoints:].view(nKeypoints * roi_ind.size(0))
 
     L1loss = nn.L1Loss()
-    pos_loss = L1loss(xy_pred, xy_gt) / nWidth
+    pos_loss = L1loss(xy_pred, xy_gt) #/ nWidth
 
     pdist = nn.PairwiseDistance(p=2)
     conf_loss = L1loss(conf_pred, torch.exp(-tau * pdist(xy_pred, xy_gt)).detach())
@@ -176,10 +178,8 @@ if __name__ == "__main__":
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
-        if args.checkpoint:
-            model.load_state_dict(torch.load(args.checkpoint))
         if args.partial_preload:
-            model.load_segonly_state_dict(torch.load(args.checkpoint))
+            model.load_segonly_state_dict(torch.load(args.partial_preload))
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
@@ -189,9 +189,11 @@ if __name__ == "__main__":
 
         # class_weights = 1.0/train_dataset.get_class_probability()
         criterion = torch.nn.CrossEntropyLoss()
+    if args.checkpoint:
+        model.load_state_dict(torch.load(args.checkpoint))
 
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    parameters = filter(lambda p: p.requires_grad, model.parameters())
+    optimizer = torch.optim.Adam(parameters, lr=LEARNING_RATE)
 
     train()
 
