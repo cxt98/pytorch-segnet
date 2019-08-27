@@ -37,7 +37,7 @@ NUM_KEYPOINTS = 8 + 1  # 8 corners + 1 center or 2 major points + 1 center
 NUM_EPOCHS = 100
 
 LEARNING_RATE = 5e-4
-BATCH_SIZE = 1
+BATCH_SIZE = 12
 
 
 # Arguments

@@ -44,6 +44,8 @@ class SegNet(nn.Module):
         self.createFeatureLayers()
         self.createSegLayers()
         self.createRegLayers()
+        # self.freeze_seg()
+        # self.freeze_encoder()
 
     def createFeatureLayers(self):
         self.vgg16 = models.vgg16(pretrained=True)
@@ -58,6 +60,7 @@ class SegNet(nn.Module):
                       padding=(0, 0, 0)),
             nn.BatchNorm3d(64)
         ])
+
         self.EPI_row = nn.Sequential(*[
             nn.Conv3d(in_channels=self.input_channels,
                       out_channels=64,
@@ -66,6 +69,7 @@ class SegNet(nn.Module):
                       padding=(0, 1, 1)),
             nn.BatchNorm3d(64)
         ])
+
 
         self.EPI_col = nn.Sequential(*[
             nn.Conv3d(in_channels=self.input_channels,
@@ -77,6 +81,7 @@ class SegNet(nn.Module):
             nn.BatchNorm3d(64)
         ])
 
+
         self.encoder_conv_00 = nn.Sequential(*[
             nn.Conv2d(in_channels=64 * (2 * self.angular_size + 1),
                       out_channels=64,
@@ -84,6 +89,8 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(64)
         ])
+
+
         self.encoder_conv_01 = nn.Sequential(*[
             nn.Conv2d(in_channels=64,
                       out_channels=64,
@@ -91,6 +98,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(64)
         ])
+
+
+
         self.encoder_conv_10 = nn.Sequential(*[
             nn.Conv2d(in_channels=64,
                       out_channels=128,
@@ -98,6 +108,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(128)
         ])
+
+
+
         self.encoder_conv_11 = nn.Sequential(*[
             nn.Conv2d(in_channels=128,
                       out_channels=128,
@@ -105,6 +118,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(128)
         ])
+
+
+
         self.encoder_conv_20 = nn.Sequential(*[
             nn.Conv2d(in_channels=128,
                       out_channels=256,
@@ -112,6 +128,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(256)
         ])
+
+
+
         self.encoder_conv_21 = nn.Sequential(*[
             nn.Conv2d(in_channels=256,
                       out_channels=256,
@@ -119,6 +138,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(256)
         ])
+
+
+
         self.encoder_conv_22 = nn.Sequential(*[
             nn.Conv2d(in_channels=256,
                       out_channels=256,
@@ -126,6 +148,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(256)
         ])
+
+
+
         self.encoder_conv_30 = nn.Sequential(*[
             nn.Conv2d(in_channels=256,
                       out_channels=512,
@@ -133,6 +158,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.encoder_conv_31 = nn.Sequential(*[
             nn.Conv2d(in_channels=512,
                       out_channels=512,
@@ -140,6 +168,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.encoder_conv_32 = nn.Sequential(*[
             nn.Conv2d(in_channels=512,
                       out_channels=512,
@@ -147,6 +178,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.encoder_conv_40 = nn.Sequential(*[
             nn.Conv2d(in_channels=512,
                       out_channels=512,
@@ -154,6 +188,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.encoder_conv_41 = nn.Sequential(*[
             nn.Conv2d(in_channels=512,
                       out_channels=512,
@@ -161,6 +198,9 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.encoder_conv_42 = nn.Sequential(*[
             nn.Conv2d(in_channels=512,
                       out_channels=512,
@@ -168,6 +208,8 @@ class SegNet(nn.Module):
                       padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
 
         self.init_vgg_weights()
 
@@ -181,6 +223,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.decoder_convtr_41 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=512,
                                out_channels=512,
@@ -188,6 +233,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.decoder_convtr_40 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=512,
                                out_channels=512,
@@ -195,6 +243,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.decoder_convtr_32 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=512,
                                out_channels=512,
@@ -202,6 +253,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.decoder_convtr_31 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=512,
                                out_channels=512,
@@ -209,6 +263,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(512)
         ])
+
+
+
         self.decoder_convtr_30 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=512,
                                out_channels=256,
@@ -216,6 +273,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(256)
         ])
+
+
+
         self.decoder_convtr_22 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=256,
                                out_channels=256,
@@ -223,6 +283,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(256)
         ])
+
+
+
         self.decoder_convtr_21 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=256,
                                out_channels=256,
@@ -230,6 +293,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(256)
         ])
+
+
+
         self.decoder_convtr_20 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=256,
                                out_channels=128,
@@ -237,6 +303,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(128)
         ])
+
+
+
         self.decoder_convtr_11 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=128,
                                out_channels=128,
@@ -244,6 +313,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(128)
         ])
+
+
+
         self.decoder_convtr_10 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=128,
                                out_channels=64,
@@ -251,6 +323,9 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(64)
         ])
+
+
+
         self.decoder_convtr_01 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=64,
                                out_channels=64,
@@ -258,12 +333,16 @@ class SegNet(nn.Module):
                                padding=1),
             nn.BatchNorm2d(64)
         ])
+
+
+
         self.decoder_convtr_00 = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=64,
                                out_channels=self.output_channels,
                                kernel_size=3,
                                padding=1)
         ])
+
 
     def createRegLayers(self):
         # Decoder layers
@@ -511,6 +590,67 @@ class SegNet(nn.Module):
 
         return xseg_output, xkey_output
 
+    def freeze_encoder(self):
+        self.angular_conv[0].weight.requires_grad = False
+        self.angular_conv[0].bias.requires_grad = False
+        self.EPI_row[0].weight.requires_grad = False
+        self.EPI_row[0].bias.requires_grad = False
+        self.EPI_col[0].weight.requires_grad = False
+        self.EPI_col[0].bias.requires_grad = False
+        self.encoder_conv_00[0].weight.requires_grad = False
+        self.encoder_conv_00[0].bias.requires_grad = False
+        self.encoder_conv_01[0].weight.requires_grad = False
+        self.encoder_conv_01[0].bias.requires_grad = False
+        self.encoder_conv_10[0].weight.requires_grad = False
+        self.encoder_conv_10[0].bias.requires_grad = False
+        self.encoder_conv_11[0].weight.requires_grad = False
+        self.encoder_conv_11[0].bias.requires_grad = False
+        self.encoder_conv_20[0].weight.requires_grad = False
+        self.encoder_conv_20[0].bias.requires_grad = False
+        self.encoder_conv_21[0].weight.requires_grad = False
+        self.encoder_conv_21[0].bias.requires_grad = False
+        self.encoder_conv_22[0].weight.requires_grad = False
+        self.encoder_conv_22[0].bias.requires_grad = False
+        self.encoder_conv_30[0].weight.requires_grad = False
+        self.encoder_conv_30[0].bias.requires_grad = False
+        self.encoder_conv_31[0].weight.requires_grad = False
+        self.encoder_conv_31[0].bias.requires_grad = False
+        self.encoder_conv_32[0].weight.requires_grad = False
+        self.encoder_conv_32[0].bias.requires_grad = False
+        self.encoder_conv_40[0].weight.requires_grad = False
+        self.encoder_conv_40[0].bias.requires_grad = False
+        self.encoder_conv_41[0].weight.requires_grad = False
+        self.encoder_conv_41[0].bias.requires_grad = False
+        self.encoder_conv_42[0].weight.requires_grad = False
+        self.encoder_conv_42[0].bias.requires_grad = False
+
+    def freeze_seg(self):
+        self.decoder_convtr_42[0].weight.requires_grad = False
+        self.decoder_convtr_42[0].bias.requires_grad = False
+        self.decoder_convtr_41[0].weight.requires_grad = False
+        self.decoder_convtr_41[0].bias.requires_grad = False
+        self.decoder_convtr_40[0].weight.requires_grad = False
+        self.decoder_convtr_40[0].bias.requires_grad = False
+        self.decoder_convtr_32[0].weight.requires_grad = False
+        self.decoder_convtr_32[0].bias.requires_grad = False
+        self.decoder_convtr_31[0].weight.requires_grad = False
+        self.decoder_convtr_31[0].bias.requires_grad = False
+        self.decoder_convtr_30[0].weight.requires_grad = False
+        self.decoder_convtr_30[0].bias.requires_grad = False
+        self.decoder_convtr_22[0].weight.requires_grad = False
+        self.decoder_convtr_22[0].bias.requires_grad = False
+        self.decoder_convtr_21[0].weight.requires_grad = False
+        self.decoder_convtr_21[0].bias.requires_grad = False
+        self.decoder_convtr_20[0].weight.requires_grad = False
+        self.decoder_convtr_20[0].bias.requires_grad = False
+        self.decoder_convtr_11[0].weight.requires_grad = False
+        self.decoder_convtr_11[0].bias.requires_grad = False
+        self.decoder_convtr_10[0].weight.requires_grad = False
+        self.decoder_convtr_10[0].bias.requires_grad = False
+        self.decoder_convtr_01[0].weight.requires_grad = False
+        self.decoder_convtr_01[0].bias.requires_grad = False
+        self.decoder_convtr_00[0].weight.requires_grad = False
+        self.decoder_convtr_00[0].bias.requires_grad = False
 
     def init_vgg_weights(self):
         # assert self.encoder_conv_00[0].weight.size() == self.vgg16.features[0].weight.size()
@@ -586,5 +726,5 @@ class SegNet(nn.Module):
             if name not in own_state:
                 print ("[not exist]" + name)
                 continue
-            print (name)
+            # print (name)
             own_state[name].copy_(param.data)
