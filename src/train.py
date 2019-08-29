@@ -59,6 +59,7 @@ validation = args.validation
 
 def train():
     is_better = True
+    is_better_val = False
     prev_loss = float('inf')
     prev_val_loss = float('inf')
     model.train()
@@ -113,13 +114,14 @@ def train():
         loss_f = loss_f / len(train_dataloader)
         delta = time.time() - t_start
         is_better = loss_f < prev_loss
-        is_better_val = val_loss < prev_val_loss
+        if validation:
+            is_better_val = val_loss < prev_val_loss
 
         if is_better:
             prev_loss = loss_f
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best.pth"))
             print("saved new best train model")
-        if is_better_val:
+        if is_better_val and validation:
             prev_val_loss = val_loss
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best_val.pth"))
             print("saved new best val model")

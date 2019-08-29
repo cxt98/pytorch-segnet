@@ -81,8 +81,11 @@ def validate():
             predicted_mx = predicted_mask.data.cpu().numpy()
             predicted_mx = predicted_mx.argmax(axis=0)
             # for display
-            predicted_mx[predicted_mx == 1] = 128
-            predicted_mx[predicted_mx == 2] = 255
+            predicted_mx[predicted_mx == 1] = 255
+            predicted_mx[predicted_mx == 2] = 255 - 51 * 1
+            predicted_mx[predicted_mx == 3] = 255 - 51 * 2
+            predicted_mx[predicted_mx == 4] = 255 - 51 * 3
+            predicted_mx[predicted_mx == 5] = 255 - 51 * 4
             plt.imshow(predicted_mx)
             a.set_title('Predicted Mask')
 
