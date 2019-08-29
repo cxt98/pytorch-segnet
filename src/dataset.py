@@ -46,9 +46,16 @@ class LFDataset(Dataset):
                 'mask': torch.LongTensor(gt_mask)
             }
         else:
-            data = {
-                'image': torch.FloatTensor(image)
-            }
+            if exists(self.masks[index]):
+                gt_mask = self.load_mask(path=self.masks[index])
+                data = {
+                    'image': torch.FloatTensor(image),
+                    'mask': torch.LongTensor(gt_mask)
+                }
+            else:
+                data = {
+                    'image': torch.FloatTensor(image)
+                }
 
         return data
 
@@ -61,9 +68,12 @@ class LFDataset(Dataset):
             imx_t = np.array(raw_image)
             # imx_t[imx_t < 255] = 0
             # imx_t[imx_t == 255] = 1
-            for i in range(NUM_CLASSES):
-                counts[i] += np.sum(imx_t == i)
-            counts[NUM_CLASSES] = counts[0]/50  # weight of boundary around objects, set 50x of background
+            for i in range(NUM_CLASSES+1):
+                if i == 1:
+                    counts[1] = counts[0] / 50 # weight of boundary around objects, set 50x of background
+                else:
+                    counts[i] += np.sum(imx_t == i)
+            # counts[1] = counts[0]/50  # weight of boundary around objects, set 50x of background
 
         return counts
 
@@ -84,6 +94,7 @@ class LFDataset(Dataset):
         else:
             for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
                 self.images.append(imgpath)
+                self.masks.append(imgpath.replace('LF.jpg','CV.png'))
 
     def findallimg_train(self, path):
         if not os.path.isdir(path):
@@ -168,80 +179,12 @@ class LFDataset(Dataset):
         # raw_image = raw_image.resize((224, 224))
         imx_t = np.array(raw_image)
         # border
-        imx_t[imx_t == 255] = NUM_CLASSES
+        imx_t[imx_t == 255] = 1
 
         return imx_t
 
 
-class PascalLFDataset(Dataset):
-    """Pascal LF 2007 Dataset"""
 
-    def __init__(self, list_file, img_dir, mask_dir, transform=None):
-        self.images = open(list_file, "rt").read().split("\n")[:-1]
-        self.transform = transform
-
-        self.img_extension = ".jpg"
-        self.mask_extension = ".png"
-
-        self.image_root_dir = img_dir
-        self.mask_root_dir = mask_dir
-
-        self.counts = self.__compute_class_probability()
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, index):
-        name = self.images[index]
-        image_path = os.path.join(self.image_root_dir, name + self.img_extension)
-        mask_path = os.path.join(self.mask_root_dir, name + self.mask_extension)
-
-        image = self.load_image(path=image_path)
-        gt_mask = self.load_mask(path=mask_path)
-
-        data = {
-            'image': torch.FloatTensor(image),
-            'mask': torch.LongTensor(gt_mask)
-        }
-
-        return data
-
-    def __compute_class_probability(self):
-        counts = dict((i, 0) for i in range(NUM_CLASSES))
-
-        for name in self.images:
-            mask_path = os.path.join(self.mask_root_dir, name + self.mask_extension)
-
-            raw_image = Image.open(mask_path).resize((224, 224))
-            imx_t = np.array(raw_image).reshape(224 * 224)
-            imx_t[imx_t == 255] = NUM_CLASSES
-
-            for i in range(NUM_CLASSES):
-                counts[i] += np.sum(imx_t == i)
-
-        return counts
-
-    def get_class_probability(self):
-        values = np.array(list(self.counts.values()))
-        p_values = values / np.sum(values)
-
-        return torch.Tensor(p_values)
-
-    def load_image(self, path=None):
-        raw_image = Image.open(path)
-        raw_image = np.transpose(raw_image.resize((224, 224)), (2, 1, 0))
-        imx_t = np.array(raw_image, dtype=np.float32) / 255.0
-
-        return imx_t
-
-    def load_mask(self, path=None):
-        raw_image = Image.open(path)
-        raw_image = raw_image.resize((224, 224))
-        imx_t = np.array(raw_image)
-        # border
-        imx_t[imx_t == 255] = NUM_CLASSES
-
-        return imx_t
 
 
 if __name__ == "__main__":
