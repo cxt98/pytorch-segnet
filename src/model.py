@@ -30,13 +30,15 @@ decoder_dims = [
 
 
 class SegNet(nn.Module):
-    def __init__(self, input_channels, output_channels, keypoints):
+    def __init__(self, input_channels, output_channels, keypoints, with_depth=False):
         super(SegNet, self).__init__()
 
         self.input_channels = input_channels
         self.output_channels = output_channels
 
         self.num_channels = input_channels
+
+        self.with_depth = with_depth
 
         self.angular_size = 5
         self.keypoints = keypoints
@@ -54,36 +56,36 @@ class SegNet(nn.Module):
 
         self.angular_conv = nn.Sequential(*[
             nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=64,
+                      out_channels=32,
                       kernel_size=(self.angular_size ** 2, 1, 1),
                       stride=(self.angular_size ** 2, 1, 1),
                       padding=(0, 0, 0)),
-            nn.BatchNorm3d(64)
+            nn.BatchNorm3d(32)
         ])
 
         self.EPI_row = nn.Sequential(*[
             nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=64,
+                      out_channels=32,
                       kernel_size=(self.angular_size, 3, 3),
                       stride=(self.angular_size, 1, 1),
                       padding=(0, 1, 1)),
-            nn.BatchNorm3d(64)
+            nn.BatchNorm3d(32)
         ])
 
 
         self.EPI_col = nn.Sequential(*[
             nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=64,
+                      out_channels=32,
                       kernel_size=(self.angular_size, 3, 3),
                       stride=(1, 1, 1),
                       dilation=(self.angular_size, 1, 1),
                       padding=(0, 1, 1)),
-            nn.BatchNorm3d(64)
+            nn.BatchNorm3d(32)
         ])
 
 
         self.encoder_conv_00 = nn.Sequential(*[
-            nn.Conv2d(in_channels=64 * (2 * self.angular_size + 1),
+            nn.Conv2d(in_channels=32 * (2 * self.angular_size + 1),
                       out_channels=64,
                       kernel_size=3,
                       padding=1),
@@ -343,7 +345,6 @@ class SegNet(nn.Module):
                                padding=1)
         ])
 
-
     def createRegLayers(self):
         # Decoder layers
 
@@ -433,7 +434,7 @@ class SegNet(nn.Module):
         ])
         self.decoder_convtr_00_k = nn.Sequential(*[
             nn.ConvTranspose2d(in_channels=64,
-                               out_channels=3*self.keypoints,
+                               out_channels=3*self.keypoints + self.with_depth,
                                kernel_size=3,
                                padding=1)
         ])
@@ -566,7 +567,7 @@ class SegNet(nn.Module):
 
         # xkey_softmax = F.softmax(x_00d_k, dim=self.keypoints * 3)
         xkey_output = x_00d_k
-        xkey_output[:, 2*self.keypoints:] = F.sigmoid(xkey_output[:, 2*self.keypoints:])
+        xkey_output[:, 2*self.keypoints:] = torch.sigmoid(xkey_output[:, 2*self.keypoints:])  # for additional depth regression channel, also use sigmoid
 
         if DEBUG:
             print("dim_ang: {}".format(dim_ang))

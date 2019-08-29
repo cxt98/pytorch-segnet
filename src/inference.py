@@ -38,7 +38,7 @@ plt.axis('off')
 # Constants
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1
-NUM_KEYPOINTS = 9
+NUM_KEYPOINTS = 1  # center only
 BATCH_SIZE = 1
 
 # Arguments

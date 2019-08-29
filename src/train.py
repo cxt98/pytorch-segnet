@@ -33,12 +33,12 @@ from torch.optim.lr_scheduler import StepLR
 # Constants
 NUM_INPUT_CHANNELS = 3
 NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1  # boundary around object
-NUM_KEYPOINTS = 8 + 1  # 8 corners + 1 center or 2 major points + 1 center
+NUM_KEYPOINTS = 1  # 1 center
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 1e-3
-BATCH_SIZE = 12
+LEARNING_RATE = 1e-4
+BATCH_SIZE = 4
 
 
 # Arguments
@@ -74,28 +74,38 @@ def train():
         for batch in train_dataloader:
             input_tensor = torch.autograd.Variable(batch['image'])
             seg_target_tensor = torch.autograd.Variable(batch['mask'])
+            depth_target_tensor = torch.autograd.Variable(batch['depth_mask'])
             key_target_tensor = torch.autograd.Variable(batch['gt_offset'])
-
             if CUDA:
                 input_tensor = input_tensor.cuda()
                 seg_target_tensor = seg_target_tensor.cuda()
+                depth_target_tensor = depth_target_tensor.cuda()
                 key_target_tensor = key_target_tensor.cuda()
 
-            seg_tensor, key_tensor = model(input_tensor)
-
+            seg_tensor, key_depth_tensor = model(input_tensor)
+            key_tensor = key_depth_tensor[:, :-1]
+            depth_tensor = key_depth_tensor[:, -1]
             optimizer.zero_grad()
             loss_seg = criterion(seg_tensor, seg_target_tensor)
             loss_key = calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor)
-            loss = loss_seg + loss_key
+            loss_depth = calculate_depthloss(depth_tensor, depth_target_tensor, seg_target_tensor)
+            # print('loss_seg')
+            # print(loss_seg)
+            # print('loss_key')
+            # print(loss_key)
+            # print('loss_depth')
+            # print(loss_depth)
+            loss = loss_seg + loss_key + loss_depth
 
             loss.backward()
             optimizer.step()
 
             if batch_id % 10 == 0:
-                print("Epoch #{}\tBatch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_reg: {:.8f}".format(epoch + 1, batch_id, loss, loss_seg, loss_key))
+                print("Epoch #{}\tBatch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_key: {:.8f}\tLoss_depth: {:.8f}".
+                      format(epoch + 1, batch_id, loss, loss_seg, loss_key, loss_depth))
             loss_f += loss.float()
             loss_seg_f += loss_seg.float()
-            loss_reg_f += loss_key.float()
+            loss_reg_f += loss_depth.float()
             prediction_f = seg_tensor.float()
             batch_id = batch_id + 1
 
@@ -113,6 +123,28 @@ def train():
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
             print("saved new best model")
         print("Epoch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_reg: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, loss_seg_f, loss_reg_f, delta))
+
+
+def calculate_depthloss(depth_tensor, depth_target_tensor, seg_target_tensor):
+    nBatch, nWidth, nHeight = seg_target_tensor.size()
+    seg_target_tensor = seg_target_tensor.contiguous().view(nBatch * nWidth * nHeight)
+    depth_tensor = depth_tensor.contiguous().view(nBatch * nWidth * nHeight)
+    depth_target_tensor = depth_target_tensor.contiguous().view(nBatch * nWidth * nHeight)
+
+    norm_factor = 10
+    roi_ind = seg_target_tensor.nonzero().squeeze()
+
+    if roi_ind.size(0) == 0:  # no segmentation estimation output
+        return torch.tensor(0.0).cuda()
+
+    depth_tensor = depth_tensor.index_select(dim=0, index=roi_ind)
+    depth_target_tensor = depth_target_tensor.index_select(dim=0, index=roi_ind)
+    # LS = nn.L1Loss().cuda()
+    # depth_loss = LS(depth_target_tensor, depth_tensor)
+    # print('loss using L1loss: ', depth_loss)
+    depth_loss = ((depth_target_tensor - depth_tensor) * (depth_target_tensor - depth_tensor)).sum().sqrt() / roi_ind.size(0)
+
+    return norm_factor * depth_loss
 
 
 def calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor):
@@ -150,8 +182,8 @@ def calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor):
                          xy_gt[nKeypoints:2*nKeypoints].view(nKeypoints * roi_ind.size(0))), dim=1)
     conf_pred = key_tensor[2*nKeypoints:].view(nKeypoints * roi_ind.size(0))
 
-    L1loss = nn.L1Loss()
-    pos_loss = L1loss(xy_pred, xy_gt) #/ nWidth
+    L1loss = nn.L1Loss().cuda()
+    pos_loss = L1loss(xy_pred, xy_gt)  #/ nWidth
 
     pdist = nn.PairwiseDistance(p=2)
     conf_loss = L1loss(conf_pred, torch.exp(-tau * pdist(xy_pred, xy_gt)).detach())
@@ -163,7 +195,7 @@ if __name__ == "__main__":
     data_root = args.data_root
 
     CUDA = 1 # args.gpu is not None
-    GPU_ID = [0, 1]
+    GPU_ID = [0]
 
     if args.edgemap:
         edgemap = True
@@ -179,11 +211,12 @@ if __name__ == "__main__":
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
-                       output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
+                       output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS, with_depth=True).cuda()
         if args.partial_preload:
             model.load_segonly_state_dict(torch.load(args.partial_preload))
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
+        print(class_weights)
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,

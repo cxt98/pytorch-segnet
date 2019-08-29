@@ -1,19 +1,16 @@
 """LF Dataset Segmentation Dataloader"""
 
-from collections import Counter
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 import torch
 from torch.utils.data import Dataset
-from tqdm import tqdm
 from PIL import Image
 import glob
 from os.path import exists
 import json
 
-LF_CLASSES = {'background':0,  # always index 0
-              'wine_cup':1}
+LF_CLASSES = {'background': 0,  # always index 0
+              'wine_cup': 1}
 
 NUM_CLASSES = len(LF_CLASSES)
 
@@ -30,7 +27,7 @@ class LFDataset(Dataset):
         self.edgemap = edgemap
         self.root_path = root_path
         self.intriscM = np.matrix([[112, 0.0, 112.0],[0.0, 112, 112.0],[0.0, 0.0, 1.0]])
-        self.num_kpts = 8 + 1 # 8 corner + 1 centroid
+        self.num_kpts = 1 + 1 # 1 center + 1 centroid
         if self.validation:
             self.findallimg_validate(self.root_path)
         else:
@@ -46,11 +43,12 @@ class LFDataset(Dataset):
         if not self.validation:
             gt_mask = self.load_mask(path=self.masks[index])
             json_info = self.loadjson(path=self.jsonfile[index])
-            gt_offset = self.generate_offset_map(jsoninfo=json_info, mask=gt_mask, simplfied=False)
+            gt_offset, depth_mask = self.generate_offset_map(jsoninfo=json_info, mask=gt_mask, simplfied=False)
             data = {
                 'image': torch.FloatTensor(image),
                 'mask': torch.LongTensor(gt_mask),
-                'gt_offset': torch.FloatTensor(gt_offset)
+                'gt_offset': torch.FloatTensor(gt_offset),
+                'depth_mask': torch.FloatTensor(depth_mask)
             }
         else:
             # kpts_3d = []
@@ -65,7 +63,7 @@ class LFDataset(Dataset):
 
         return data
 
-    def loadjson(self,path):
+    def loadjson(self, path):
         """
         Loads the data from a json file.
         If there are no objects of interest, then load all the objects.
@@ -79,6 +77,7 @@ class LFDataset(Dataset):
         pointsBoxes = []
         boxes = []
         class_name = []
+        scaled_depth = []
         # points_keypoints_3d = []
         # pointsBelief = []
         # poses = []
@@ -105,6 +104,8 @@ class LFDataset(Dataset):
 
             pointsBoxes.append(boxpoint)
 
+            scaled_depth.append(self.intriscM[0, 0] / info['cuboid_centroid'][-1])
+
             # 2d projected key points
             point2dToAdd = []
             pointdata = info['projected_cuboid']
@@ -130,10 +131,11 @@ class LFDataset(Dataset):
             points_keypoints_3d.append(point3dToAdd)
 
         return {
+            "scaled_depth" : scaled_depth,
             "class": class_name,
             "bbox": pointsBoxes,
-            "keypoints_2d": points_keypoints_2d, # 8 keypoints + center
-            "keypoints_3d": points_keypoints_3d # 8 keypoints + center
+            "keypoints_2d": points_keypoints_2d,  # 8 keypoints + center
+            "keypoints_3d": points_keypoints_3d  # 8 keypoints + center
         }
 
     def generate_offset_map(self, jsoninfo, mask, simplfied=False):
@@ -141,15 +143,15 @@ class LFDataset(Dataset):
         img_size = mask.shape
         temp_mask[temp_mask == NUM_CLASSES] = 0  # edge to background
         # temp_mask[temp_mask > 0] = 1 # create a mask to show where objects exist
-        x_offset = np.tile(np.arange(img_size[1]),(img_size[0],1))
+        x_offset = np.tile(np.arange(img_size[1]), (img_size[0], 1))
         y_offset = np.transpose(np.copy(x_offset))
-        x_offset[temp_mask==0] = 0
-        y_offset[temp_mask==0] = 0
-        x_offset = np.repeat(x_offset[:, :, np.newaxis], self.num_kpts, axis=2)
-        y_offset = np.repeat(y_offset[:, :, np.newaxis], self.num_kpts, axis=2)
-        x_mask = np.zeros([img_size[0], img_size[1], self.num_kpts])
-        y_mask = np.zeros([img_size[0], img_size[1], self.num_kpts])
+        x_offset[temp_mask == 0] = 0
+        y_offset[temp_mask == 0] = 0
+        x_mask = np.zeros([img_size[0], img_size[1]])
+        y_mask = np.zeros([img_size[0], img_size[1]])
+        depth_mask = np.zeros([img_size[0], img_size[1]])
         for idx in range(len(jsoninfo['class'])):
+            scaled_depth = jsoninfo['scaled_depth'][idx]
             class_name = jsoninfo['class'][idx]
             bbox = jsoninfo['bbox'][idx]
             if simplfied:
@@ -157,7 +159,7 @@ class LFDataset(Dataset):
             else:
                 keypoint2d = jsoninfo['keypoints_2d'][idx]
             target_label = LF_CLASSES[class_name]
-            current_instance_mask = np.full(img_size,False)
+            current_instance_mask = np.full(img_size, False)
             bbox_rowindex = (self.boundary_check(bbox[0][1], 0, img_size[0]),
                              self.boundary_check(bbox[2][1], 0, img_size[0]))
             bbox_colindex = (self.boundary_check(bbox[0][0], 0, img_size[1]),
@@ -165,15 +167,14 @@ class LFDataset(Dataset):
             if bbox_rowindex[0] == bbox_rowindex[1] or bbox_colindex[0] == bbox_colindex[1]:
                 continue
             else:
-                for kp in range(len(keypoint2d)):
-                    current_instance_mask[bbox_rowindex[0]:bbox_rowindex[1],bbox_colindex[0]:bbox_colindex[1]] = \
-                        (temp_mask[bbox_rowindex[0]:bbox_rowindex[1], bbox_colindex[0]:bbox_colindex[1]]==target_label)
+                current_instance_mask[bbox_rowindex[0]:bbox_rowindex[1],bbox_colindex[0]:bbox_colindex[1]] = \
+                    (temp_mask[bbox_rowindex[0]:bbox_rowindex[1], bbox_colindex[0]:bbox_colindex[1]] == target_label)
 
-                    x_mask[:, :, kp] = x_mask[:, :, kp] + np.multiply(keypoint2d[kp][0] * current_instance_mask.astype(int),
-                                                                      (x_mask[:, :, kp] == 0).astype(int))
+                x_mask = x_mask + np.multiply(keypoint2d[-1][0] * current_instance_mask.astype(int), (x_mask == 0).astype(int))
 
-                    y_mask[:, :, kp] = y_mask[:, :, kp] + np.multiply(keypoint2d[kp][1] * current_instance_mask.astype(int),
-                                                                        (y_mask[:, :, kp] == 0).astype(int))
+                y_mask = y_mask + np.multiply(keypoint2d[-1][1] * current_instance_mask.astype(int), (y_mask == 0).astype(int))
+
+                depth_mask = depth_mask + scaled_depth * current_instance_mask.astype(float)
 
         x_offset = (x_offset - x_mask) / img_size[1]
         y_offset = (y_offset - y_mask) / img_size[0]
@@ -181,7 +182,7 @@ class LFDataset(Dataset):
         # self.save_offset_mask_to_img("/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/test",x_offset,"x")
         # self.save_offset_mask_to_img(
         #     "/media/alienicp/5f3d1485-53ed-4161-af42-63cef2fc27a1/home/logan/LFdata/wc/test", y_offset, "y")
-        return np.transpose(np.concatenate((x_offset,y_offset),axis=2), (2, 0, 1))
+        return np.transpose(np.stack((x_offset, y_offset), axis=2), (2, 0, 1)), depth_mask
 
     def get_3d_3pts(self, json_indexed_kps3D):
         selected_pts = []
@@ -217,7 +218,6 @@ class LFDataset(Dataset):
 
         return value
 
-
     def __compute_class_probability(self):
         counts = dict((i, 0) for i in range(NUM_CLASSES + 1))
 
@@ -227,9 +227,12 @@ class LFDataset(Dataset):
             imx_t = np.array(raw_image)
             # imx_t[imx_t < 255] = 0
             # imx_t[imx_t == 255] = 1
-            for i in range(NUM_CLASSES):
-                counts[i] += np.sum(imx_t == i)
-            counts[NUM_CLASSES] = counts[0]/50  # weight of boundary around objects, set 50x of background
+            for i in range(NUM_CLASSES+1):
+                if i == 1:
+                    counts[i] = counts[0] / 50
+                else:
+                    counts[i] += np.sum(imx_t == i)
+            # counts[NUM_CLASSES] = counts[0]/50  # weight of boundary around objects, set 50x of background
 
         return counts
 
@@ -285,8 +288,8 @@ class LFDataset(Dataset):
             else:
                 # NEXT TIMES: directly get lf imgs and masks
                 for lfpath in sorted(glob.glob(path + "/*.Sub3_3.lf.png")):
-                    maskpath = lfpath.replace('lf', 'cs')
-                    jsonpath = lfpath.replace("lf.png","json")
+                    maskpath = lfpath.replace('lf.png', 'cs.png')
+                    jsonpath = lfpath.replace("lf.png", "json")
                     if exists(maskpath):
                         self.masks.append(maskpath)
                         self.images.append(lfpath)
@@ -338,7 +341,7 @@ class LFDataset(Dataset):
         # raw_image = raw_image.resize((224, 224))
         imx_t = np.array(raw_image)
         # border
-        imx_t[imx_t == 255] = NUM_CLASSES
+        imx_t[imx_t == 255] = 1
 
         return imx_t
 
