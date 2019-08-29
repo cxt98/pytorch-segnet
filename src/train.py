@@ -176,7 +176,7 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(args.checkpoint))
 
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
-    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
+    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
 
     train()
 
