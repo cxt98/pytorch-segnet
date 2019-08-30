@@ -92,7 +92,7 @@ class LFDataset(Dataset):
             for path_entry in folders:
                 self.findallimg_validate(path_entry)
         else:
-            for imgpath in sorted(glob.glob(path + '/*lf.png')):
+            for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
                 self.images.append(imgpath)
                 self.masks.append(imgpath.replace('LF.jpg','CV.png'))
 

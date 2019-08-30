@@ -55,7 +55,8 @@ parser.add_argument('--edgemap')
 
 args = parser.parse_args()
 validation = args.validation
-
+train_namefile = '/loss_train.csv'
+val_namefile = '/loss_test.csv'
 
 def train():
     is_better = True
@@ -105,7 +106,7 @@ def train():
 
                     predicted_tensor, softmaxed_tensor = model(input_tensor)
 
-                    loss_temp = criterion_val(softmaxed_tensor, target_tensor)
+                    loss_temp = criterion(softmaxed_tensor, target_tensor)
                     val_loss += loss_temp.float()
                 val_loss = val_loss / len(val_dataloader)
                 print("Validation Loss: {:.8f}".format(val_loss))
@@ -125,12 +126,24 @@ def train():
             prev_val_loss = val_loss
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best_val.pth"))
             print("saved new best val model")
-        if epoch % 10 == 0:
+        if epoch % 5 == 0:
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
-            print("saved model every 10 epoches")
+            print("saved model every 5 epoches")
         print("Epoch #{}\tLoss: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, delta))
 
 
+
+
+        with open (args.save_dir+train_namefile,'a') as file:
+            s = '{}, {:.15f}\n'.format(
+                epoch, loss_f)
+            file.write(s)
+
+        if validation:
+            with open (args.save_dir+val_namefile,'a') as file:
+                s = '{}, {:.15f}\n'.format(
+                    epoch, val_loss)
+                file.write(s)
 
 
 
@@ -166,7 +179,7 @@ if __name__ == "__main__":
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
-        criterion_val = torch.nn.CrossEntropyLoss().cuda()
+        # criterion_val = torch.nn.CrossEntropyLoss().cuda()
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS)
@@ -178,7 +191,7 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(args.checkpoint))
 
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
-    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
+    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
 
     train()
 
