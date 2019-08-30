@@ -56,36 +56,36 @@ class SegNet(nn.Module):
 
         self.angular_conv = nn.Sequential(*[
             nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=32,
+                      out_channels=64,
                       kernel_size=(self.angular_size ** 2, 1, 1),
                       stride=(self.angular_size ** 2, 1, 1),
                       padding=(0, 0, 0)),
-            nn.BatchNorm3d(32)
+            nn.BatchNorm3d(64)
         ])
 
         self.EPI_row = nn.Sequential(*[
             nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=32,
+                      out_channels=64,
                       kernel_size=(self.angular_size, 3, 3),
                       stride=(self.angular_size, 1, 1),
                       padding=(0, 1, 1)),
-            nn.BatchNorm3d(32)
+            nn.BatchNorm3d(64)
         ])
 
 
         self.EPI_col = nn.Sequential(*[
             nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=32,
+                      out_channels=64,
                       kernel_size=(self.angular_size, 3, 3),
                       stride=(1, 1, 1),
                       dilation=(self.angular_size, 1, 1),
                       padding=(0, 1, 1)),
-            nn.BatchNorm3d(32)
+            nn.BatchNorm3d(64)
         ])
 
 
         self.encoder_conv_00 = nn.Sequential(*[
-            nn.Conv2d(in_channels=32 * (2 * self.angular_size + 1),
+            nn.Conv2d(in_channels=64 * (2 * self.angular_size + 1),
                       out_channels=64,
                       kernel_size=3,
                       padding=1),

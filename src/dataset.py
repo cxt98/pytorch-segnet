@@ -10,7 +10,10 @@ from os.path import exists
 import json
 
 LF_CLASSES = {'background': 0,  # always index 0
-              'wine_cup': 1}
+              'wine_cup': 2,
+              'tall_cup': 3,
+              'cham_cup':4,
+              'glass_jar':5}
 
 NUM_CLASSES = len(LF_CLASSES)
 
@@ -141,7 +144,7 @@ class LFDataset(Dataset):
     def generate_offset_map(self, jsoninfo, mask, simplfied=False):
         temp_mask = np.copy(mask)
         img_size = mask.shape
-        temp_mask[temp_mask == NUM_CLASSES] = 0  # edge to background
+        temp_mask[temp_mask == 1] = 0  # edge to background
         # temp_mask[temp_mask > 0] = 1 # create a mask to show where objects exist
         x_offset = np.tile(np.arange(img_size[1]), (img_size[0], 1))
         y_offset = np.transpose(np.copy(x_offset))
@@ -229,7 +232,7 @@ class LFDataset(Dataset):
             # imx_t[imx_t == 255] = 1
             for i in range(NUM_CLASSES+1):
                 if i == 1:
-                    counts[i] = counts[0] / 50
+                    counts[i] = counts[0] / 150
                 else:
                     counts[i] += np.sum(imx_t == i)
             # counts[NUM_CLASSES] = counts[0]/50  # weight of boundary around objects, set 50x of background

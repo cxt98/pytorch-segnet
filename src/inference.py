@@ -91,17 +91,19 @@ def validate():
 
         # gt_kp = batch['keypoints_2d'].data.cpu().numpy() ########### Only for debug use, plot the gt against estimation
 
+        xseg_output, key_depth_tensor = model(input_tensor)
+        key_tensor = key_depth_tensor[:, :-1]
+        depth_tensor = key_depth_tensor[:, -1]
 
-        xseg_output, xkey_output = model(input_tensor)
         # loss = criterion(predicted_tensor, target_tensor)
-        img_size = (xkey_output.shape[2], xkey_output.shape[3])
+        img_size = (key_tensor.shape[2], key_tensor.shape[3])
         x_offsetmask = np.tile(np.arange(img_size[1]), (img_size[0], 1))
         y_offsetmask = np.transpose(np.tile(np.arange(img_size[0]), (img_size[1], 1)))
         x_offsetmask = np.repeat(x_offsetmask[:, :, np.newaxis], NUM_KEYPOINTS, axis=2)
         y_offsetmask = np.repeat(y_offsetmask[:, :, np.newaxis], NUM_KEYPOINTS, axis=2)
 
-        for idx, predicted_keypoints in enumerate(xkey_output):
-            save_to_npy = np.zeros([img_size[0], img_size[1], 3, NUM_KEYPOINTS])
+        for idx, predicted_keypoints in enumerate(key_tensor):
+
             input_image = input_tensor[idx]
             seg_mask = xseg_output[idx].data.cpu().numpy()
             seg_mask = seg_mask.argmax(axis=0)
@@ -112,16 +114,7 @@ def validate():
             predicted_conf = predicted_kps[2*NUM_KEYPOINTS::, :, :]
 
             for corner_idx in range(predicted_kpX.shape[0]):
-                # if Debug:
-                #     kpX = predicted_kpX[corner_idx, :, :]
-                #     kpY = predicted_kpY[corner_idx, :, :]
-                #     kpC = predicted_conf[corner_idx, :, :]
-                #     kpX[seg_mask != targetLabel] = 0
-                #     kpY[seg_mask != targetLabel] = 0
-                #     kpC[seg_mask != targetLabel] = 0
-                #     save_to_npy[:, :, :, corner_idx] = np.dstack((kpX,kpY,kpC))
-                #
-                # else:
+
                 fig = plt.figure()
                 plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
                 kpX = predicted_kpX[corner_idx, seg_mask == targetLabel]
@@ -177,8 +170,11 @@ def validate():
             predicted_mx = predicted_mask.data.cpu().numpy()
             predicted_mx = predicted_mx.argmax(axis=0)
             # for display
-            predicted_mx[predicted_mx == 1] = 128
-            predicted_mx[predicted_mx == 2] = 255
+            predicted_mx[predicted_mx == 1] = 51 * 5
+            predicted_mx[predicted_mx == 2] = 51 * 4
+            predicted_mx[predicted_mx == 3] = 51 * 3
+            predicted_mx[predicted_mx == 4] = 51 * 2
+            predicted_mx[predicted_mx == 5] = 51 * 1
             plt.imshow(predicted_mx)
             a.set_title('Predicted Mask')
             single_mask = Image.fromarray(np.uint8(predicted_mx))
@@ -356,7 +352,7 @@ if __name__ == "__main__":
 
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
-                       output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS).cuda()
+                       output_channels=NUM_OUTPUT_CHANNELS, keypoints=NUM_KEYPOINTS, with_depth=True).cuda()
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         # class_weights = 1.0 / val_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss().cuda()

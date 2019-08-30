@@ -37,8 +37,8 @@ NUM_KEYPOINTS = 1  # 1 center
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 1e-4
-BATCH_SIZE = 4
+LEARNING_RATE = 1e-3
+BATCH_SIZE = 12
 
 
 # Arguments
@@ -69,6 +69,7 @@ def train():
         loss_f = 0
         loss_seg_f = 0
         loss_reg_f = 0
+        loss_key_f = 0
         t_start = time.time()
         batch_id = 0
         for batch in train_dataloader:
@@ -100,18 +101,20 @@ def train():
             loss.backward()
             optimizer.step()
 
-            if batch_id % 10 == 0:
+            if batch_id % 100 == 0:
                 print("Epoch #{}\tBatch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_key: {:.8f}\tLoss_depth: {:.8f}".
                       format(epoch + 1, batch_id, loss, loss_seg, loss_key, loss_depth))
             loss_f += loss.float()
             loss_seg_f += loss_seg.float()
             loss_reg_f += loss_depth.float()
+            loss_key_f += loss_key.float()
             prediction_f = seg_tensor.float()
             batch_id = batch_id + 1
 
         loss_f = loss_f / len(train_dataloader)
         loss_seg_f = loss_seg_f / len(train_dataloader)
         loss_reg_f = loss_reg_f / len(train_dataloader)
+        loss_key_f = loss_key_f / len(train_dataloader)
         delta = time.time() - t_start
         is_better = loss_f < prev_loss
 
@@ -122,7 +125,7 @@ def train():
         if epoch % 10 == 0:
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
             print("saved new best model")
-        print("Epoch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_reg: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, loss_seg_f, loss_reg_f, delta))
+        print("Epoch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_key: {:.8f}\tLoss_depth: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, loss_seg_f, loss_key_f,loss_reg_f, delta))
 
 
 def calculate_depthloss(depth_tensor, depth_target_tensor, seg_target_tensor):
@@ -195,7 +198,7 @@ if __name__ == "__main__":
     data_root = args.data_root
 
     CUDA = 1 # args.gpu is not None
-    GPU_ID = [0]
+    GPU_ID = [0,1]
 
     if args.edgemap:
         edgemap = True
@@ -216,7 +219,7 @@ if __name__ == "__main__":
             model.load_segonly_state_dict(torch.load(args.partial_preload))
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
-        print(class_weights)
+        # print(class_weights)
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
@@ -230,7 +233,7 @@ if __name__ == "__main__":
     parameters = filter(lambda p: p.requires_grad, model.parameters())
     # optimizer = torch.optim.Adam(parameters, lr=LEARNING_RATE)
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
-    scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
+    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
     train()
 
     print('train success')
