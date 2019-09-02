@@ -12,6 +12,7 @@ import glob
 from os.path import exists
 
 LF_CLASSES = ('background',  # always index 0
+              'wine_cup',
               'tall_cup')
 
 NUM_CLASSES = len(LF_CLASSES)
@@ -92,7 +93,7 @@ class LFDataset(Dataset):
             for path_entry in folders:
                 self.findallimg_validate(path_entry)
         else:
-            for imgpath in sorted(glob.glob(path + '/*lf.png')):
+            for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
                 self.images.append(imgpath)
                 self.masks.append(imgpath.replace('LF.jpg','CV.png'))
 

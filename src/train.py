@@ -27,7 +27,7 @@ import time
 import torch
 from torch.utils.data import DataLoader
 import torch.nn.parallel
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, MultiStepLR
 
 # Constants
 NUM_INPUT_CHANNELS = 3
@@ -44,6 +44,7 @@ parser = argparse.ArgumentParser(description='Train a SegNet model')
 
 parser.add_argument('--data_root', required=True)
 parser.add_argument('--val_root', required=False, default=False)
+parser.add_argument('--partial_preload', required=False)
 parser.add_argument('--validation', required=False, default=False, type=bool)
 # parser.add_argument('--train_path', required=True)
 # parser.add_argument('--img_dir', required=True)
@@ -106,7 +107,7 @@ def train():
 
                     predicted_tensor, softmaxed_tensor = model(input_tensor)
 
-                    loss_temp = criterion(softmaxed_tensor, target_tensor)
+                    loss_temp = criterion_val(softmaxed_tensor, target_tensor)
                     val_loss += loss_temp.float()
                 val_loss = val_loss / len(val_dataloader)
                 print("Validation Loss: {:.8f}".format(val_loss))
@@ -176,10 +177,12 @@ if __name__ == "__main__":
     if CUDA:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS).cuda()
+        if args.partial_preload:
+            model.load_segonly_state_dict(torch.load(args.partial_preload))
         model = torch.nn.DataParallel(model, GPU_ID).cuda()
         class_weights = 1.0/train_dataset.get_class_probability().cuda()
         criterion = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
-        # criterion_val = torch.nn.CrossEntropyLoss().cuda()
+        criterion_val = torch.nn.CrossEntropyLoss().cuda()
     else:
         model = SegNet(input_channels=NUM_INPUT_CHANNELS,
                        output_channels=NUM_OUTPUT_CHANNELS)
@@ -191,7 +194,7 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(args.checkpoint))
 
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
-    scheduler = StepLR(optimizer, step_size=200, gamma=0.1)
+    scheduler = MultiStepLR(optimizer, milestones=[3, 10], gamma=0.1)
 
     train()
 

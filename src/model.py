@@ -439,3 +439,21 @@ class SegNet(nn.Module):
         assert self.encoder_conv_42[0].bias.size() == self.vgg16.features[28].bias.size()
         self.encoder_conv_42[0].bias.data = self.vgg16.features[28].bias.data
 
+    def load_segonly_state_dict(self, state_dict):
+
+        skip_layer = {'decoder_convtr_01.0.weight',
+                      'decoder_convtr_01.0.bias',
+                      'decoder_convtr_00.0.weight',
+                      'decoder_convtr_00.0.bias'}
+        own_state = self.state_dict()
+        for name, param in state_dict.items():
+            name = name.replace('module.', '')
+            if name not in own_state:
+                print ("[not exist]" + name)
+                continue
+            if name in skip_layer:
+                print("[skip layer]" + name)
+                continue
+            # print (name)
+
+            own_state[name].copy_(param.data)
