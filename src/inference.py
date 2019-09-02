@@ -59,7 +59,7 @@ g_draw = None
 
 ######################  Set target label ############
 
-targetLabel = 2  # should > 1
+targetLabel = 3  # should > 1
 
 ######################  Set target label ############
 camera_intrinsic = [

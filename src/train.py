@@ -68,7 +68,7 @@ def train():
         scheduler.step()
         loss_f = 0
         loss_seg_f = 0
-        loss_reg_f = 0
+        loss_depth_f = 0
         loss_key_f = 0
         t_start = time.time()
         batch_id = 0
@@ -89,7 +89,7 @@ def train():
             optimizer.zero_grad()
             loss_seg = criterion(seg_tensor, seg_target_tensor)
             loss_key = calculate_keyloss(key_tensor, key_target_tensor, seg_target_tensor)
-            loss_depth = calculate_depthloss(depth_tensor, depth_target_tensor, seg_target_tensor)
+            # loss_depth = calculate_depthloss(depth_tensor, depth_target_tensor, seg_target_tensor)
             # print('loss_seg')
             # print(loss_seg)
             # print('loss_key')
@@ -103,17 +103,17 @@ def train():
 
             if batch_id % 100 == 0:
                 print("Epoch #{}\tBatch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_key: {:.8f}\tLoss_depth: {:.8f}".
-                      format(epoch + 1, batch_id, loss, loss_seg, loss_key, loss_depth))
+                      format(epoch + 1, batch_id, loss, loss_seg, loss_key, loss_depth_f))
             loss_f += loss.float()
             loss_seg_f += loss_seg.float()
-            loss_reg_f += loss_depth.float()
+            # loss_depth_f += loss_depth.float()
             loss_key_f += loss_key.float()
             prediction_f = seg_tensor.float()
             batch_id = batch_id + 1
 
         loss_f = loss_f / len(train_dataloader)
         loss_seg_f = loss_seg_f / len(train_dataloader)
-        loss_reg_f = loss_reg_f / len(train_dataloader)
+        loss_depth_f = loss_depth_f / len(train_dataloader)
         loss_key_f = loss_key_f / len(train_dataloader)
         delta = time.time() - t_start
         is_better = loss_f < prev_loss
@@ -122,10 +122,10 @@ def train():
             prev_loss = loss_f
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best.pth"))
             print("saved new best model")
-        if epoch % 10 == 0:
+        if epoch % 5 == 0:
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
             print("saved new best model")
-        print("Epoch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_key: {:.8f}\tLoss_depth: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, loss_seg_f, loss_key_f,loss_reg_f, delta))
+        print("Epoch #{}\tLoss: {:.8f}\tLoss_seg: {:.8f}\tLoss_key: {:.8f}\tLoss_depth: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, loss_seg_f, loss_key_f,loss_depth_f, delta))
 
 
 def calculate_depthloss(depth_tensor, depth_target_tensor, seg_target_tensor):

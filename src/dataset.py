@@ -10,7 +10,8 @@ from os.path import exists
 import json
 
 LF_CLASSES = {'background': 0,  # always index 0
-              'tall_cup': 2}
+                'wine_cup':2,
+              'tall_cup': 3}
 
 NUM_CLASSES = len(LF_CLASSES)
 
@@ -251,7 +252,7 @@ class LFDataset(Dataset):
             for path_entry in folders:
                 self.findallimg_validate(path_entry)
         else:
-            for imgpath in sorted(glob.glob(path + '/*lf.png')):
+            for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
                 self.images.append(imgpath)
                 # jsonpath = imgpath.replace("lf.png", "json") # debug agasint gt key points
                 # self.jsonfile.append(jsonpath) # debug agasint gt key points
