@@ -37,7 +37,7 @@ NUM_KEYPOINTS = 1  # 1 center
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-1
 BATCH_SIZE = 12
 
 
@@ -96,8 +96,8 @@ def train():
             # print(loss_key)
             # print('loss_depth')
             # print(loss_depth)
-            loss = loss_seg + loss_key + loss_depth
-
+            # loss = loss_seg + loss_key + loss_depth
+            loss = loss_seg
             loss.backward()
             optimizer.step()
 

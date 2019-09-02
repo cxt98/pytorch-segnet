@@ -57,10 +57,11 @@ args = parser.parse_args()
 g_img = None
 g_draw = None
 
+######################  Set target label ############
 
+targetLabel = 2  # should > 1
 
-targetLabel = 1  # 1 for glass
-
+######################  Set target label ############
 camera_intrinsic = [
     [1000, 0, 1000],
     [0, 1000, 1000],

@@ -27,7 +27,7 @@ class LFDataset(Dataset):
         self.edgemap = edgemap
         self.root_path = root_path
         self.intriscM = np.matrix([[112, 0.0, 112.0],[0.0, 112, 112.0],[0.0, 0.0, 1.0]])
-        self.num_kpts = 1 + 1 # 1 center + 1 centroid
+        # self.num_kpts = 1 + 1 # 1 center + 1 centroid
         if self.validation:
             self.findallimg_validate(self.root_path)
         else:
