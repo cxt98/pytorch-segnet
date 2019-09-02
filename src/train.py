@@ -37,7 +37,7 @@ NUM_KEYPOINTS = 1  # 1 center
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 1e-1
+LEARNING_RATE = 1e-3
 BATCH_SIZE = 12
 
 
@@ -97,7 +97,7 @@ def train():
             # print('loss_depth')
             # print(loss_depth)
             # loss = loss_seg + loss_key + loss_depth
-            loss = loss_seg
+            loss = loss_seg + loss_key
             loss.backward()
             optimizer.step()
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     parameters = filter(lambda p: p.requires_grad, model.parameters())
     # optimizer = torch.optim.Adam(parameters, lr=LEARNING_RATE)
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
-    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
+    scheduler = StepLR(optimizer, step_size=200, gamma=0.1)
     train()
 
     print('train success')
