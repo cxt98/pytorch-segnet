@@ -10,10 +10,7 @@ from os.path import exists
 import json
 
 LF_CLASSES = {'background': 0,  # always index 0
-              'wine_cup': 2,
-              'tall_cup': 3,
-              'cham_cup':4,
-              'glass_jar':5}
+              'tall_cup': 2}
 
 NUM_CLASSES = len(LF_CLASSES)
 
@@ -229,10 +226,10 @@ class LFDataset(Dataset):
             raw_image = Image.open(mask_path)
             imx_t = np.array(raw_image)
             # imx_t[imx_t < 255] = 0
-            # imx_t[imx_t == 255] = 1
+            imx_t[imx_t == 255] = 1
             for i in range(NUM_CLASSES+1):
                 if i == 1:
-                    counts[i] = counts[0] / 150
+                    counts[i] = counts[0] / 50
                 else:
                     counts[i] += np.sum(imx_t == i)
             # counts[NUM_CLASSES] = counts[0]/50  # weight of boundary around objects, set 50x of background
@@ -254,7 +251,7 @@ class LFDataset(Dataset):
             for path_entry in folders:
                 self.findallimg_validate(path_entry)
         else:
-            for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
+            for imgpath in sorted(glob.glob(path + '/*lf.png')):
                 self.images.append(imgpath)
                 # jsonpath = imgpath.replace("lf.png", "json") # debug agasint gt key points
                 # self.jsonfile.append(jsonpath) # debug agasint gt key points
