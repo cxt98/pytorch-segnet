@@ -12,7 +12,7 @@ import glob
 from os.path import exists
 
 LF_CLASSES = ('background',  # always index 0
-              'wc', 'tc', 'cham', 'gj')
+              'tall_cup')
 
 NUM_CLASSES = len(LF_CLASSES)
 
@@ -67,10 +67,10 @@ class LFDataset(Dataset):
             raw_image = Image.open(mask_path)
             imx_t = np.array(raw_image)
             # imx_t[imx_t < 255] = 0
-            # imx_t[imx_t == 255] = 1
+            imx_t[imx_t == 255] = 1
             for i in range(NUM_CLASSES+1):
                 if i == 1:
-                    counts[1] = counts[0] / 100 # weight of boundary around objects, set 50x of background
+                    counts[1] = counts[0] / 50 # weight of boundary around objects, set 50x of background
                 else:
                     counts[i] += np.sum(imx_t == i)
             # counts[1] = counts[0]/50  # weight of boundary around objects, set 50x of background
@@ -92,7 +92,7 @@ class LFDataset(Dataset):
             for path_entry in folders:
                 self.findallimg_validate(path_entry)
         else:
-            for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
+            for imgpath in sorted(glob.glob(path + '/*lf.png')):
                 self.images.append(imgpath)
                 self.masks.append(imgpath.replace('LF.jpg','CV.png'))
 

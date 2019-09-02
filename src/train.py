@@ -35,8 +35,8 @@ NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1 # boundary around object
 
 NUM_EPOCHS = 100
 
-LEARNING_RATE = 1e-3
-BATCH_SIZE = 16
+LEARNING_RATE = 1e-1
+BATCH_SIZE = 14
 VAL_BATCH_SIZE = 1
 
 # Arguments
@@ -126,7 +126,7 @@ def train():
             prev_val_loss = val_loss
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_best_val.pth"))
             print("saved new best val model")
-        if epoch % 5 == 0:
+        if epoch % 50 == 0:
             torch.save(model.state_dict(), os.path.join(args.save_dir, "model_" + str(epoch) + ".pth"))
             print("saved model every 5 epoches")
         print("Epoch #{}\tLoss: {:.8f}\t Time: {:2f}s".format(epoch+1, loss_f, delta))
@@ -191,7 +191,7 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(args.checkpoint))
 
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
-    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
+    scheduler = StepLR(optimizer, step_size=200, gamma=0.1)
 
     train()
 
