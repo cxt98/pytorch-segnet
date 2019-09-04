@@ -18,7 +18,7 @@ python ./src/inference.py --data_root /home/cxt/Documents/research/lf_dope/lf_tr
 
 from __future__ import print_function
 import argparse
-from dataset import LFDataset, NUM_CLASSES
+from dataset import LFDataset, NUM_CLASSES, LF_CLASSES
 import matplotlib.pyplot as plt
 from model import SegNet
 import numpy as np
@@ -28,6 +28,7 @@ import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import cv2
+import csv
 # from scipy.spatial.transform import Rotation as R
 # import point_cloud_utils as pcu
 
@@ -59,7 +60,7 @@ g_draw = None
 
 ######################  Set target label ############
 
-targetLabel = 3  # should > 1
+# targetLabel = 3  # should > 1
 
 ######################  Set target label ############
 camera_intrinsic = [
@@ -115,41 +116,48 @@ def validate():
             predicted_conf = predicted_kps[2*NUM_KEYPOINTS::, :, :]
 
             for corner_idx in range(predicted_kpX.shape[0]):
+                for object_name in LF_CLASSES:
+                    if object_name == 'background':
+                        continue
+                    targetLabel = LF_CLASSES[object_name]
+                    fig = plt.figure()
+                    plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
+                    kpX = predicted_kpX[corner_idx, seg_mask == targetLabel]
+                    kpY = predicted_kpY[corner_idx, seg_mask == targetLabel]
+                    kpC = predicted_conf[corner_idx, seg_mask == targetLabel]
+                    kpX = np.reshape(kpX, (1, -1))
+                    kpY = np.reshape(kpY, (1, -1))
+                    kpC = np.reshape(kpC, (1, -1))
+                    # valid_mask = np.logical_and(np.logical_and(kpX >= 0, kpX <= img_size[1]),
+                    #                               np.logical_and(kpY >= 0, kpY <= img_size[0]))
+                    valid_mask = np.full(kpX.shape, True)  # don't exclude the points even it is out of bounday
+                    kpX = np.ma.MaskedArray(kpX, mask=~valid_mask)
+                    kpY = np.ma.MaskedArray(kpY, mask=~valid_mask)
+                    kpC = np.ma.MaskedArray(kpC, mask=~valid_mask)
+                    kpX = np.ma.compress_cols(kpX)
+                    kpY = np.ma.compress_cols(kpY)
+                    kpC = np.ma.compress_cols(kpC)
+                    topN = 50
+                    kp = np.hstack((np.transpose(kpX), np.transpose(kpY), np.transpose(kpC)))
+                    kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)[:topN]
+                    # kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)
+                    kpX_topN = [a[0] for a in kp_topN]
+                    kpY_topN = [a[1] for a in kp_topN]
 
-                fig = plt.figure()
-                plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
-                kpX = predicted_kpX[corner_idx, seg_mask == targetLabel]
-                kpY = predicted_kpY[corner_idx, seg_mask == targetLabel]
-                kpC = predicted_conf[corner_idx, seg_mask == targetLabel]
-                kpX = np.reshape(kpX, (1, -1))
-                kpY = np.reshape(kpY, (1, -1))
-                kpC = np.reshape(kpC, (1, -1))
-                # valid_mask = np.logical_and(np.logical_and(kpX >= 0, kpX <= img_size[1]),
-                #                               np.logical_and(kpY >= 0, kpY <= img_size[0]))
-                valid_mask = np.full(kpX.shape, True)  # don't exclude the points even it is out of bounday
-                kpX = np.ma.MaskedArray(kpX, mask=~valid_mask)
-                kpY = np.ma.MaskedArray(kpY, mask=~valid_mask)
-                kpC = np.ma.MaskedArray(kpC, mask=~valid_mask)
-                kpX = np.ma.compress_cols(kpX)
-                kpY = np.ma.compress_cols(kpY)
-                kpC = np.ma.compress_cols(kpC)
-                topN = 200
-                kp = np.hstack((np.transpose(kpX), np.transpose(kpY), np.transpose(kpC)))
-                kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)[:topN]
-                # kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)
-                kpX_topN = [a[0] for a in kp_topN]
-                kpY_topN = [a[1] for a in kp_topN]
+                    plt.plot(kpX_topN, kpY_topN, colorcodes[corner_idx] + 'o')
+                    plt.show()
+                    ######### Only for debug use, plot the gt against estimation
+                    # for cup_number in range(gt_kp.shape[1]):
+                    #     plt.plot(gt_kp[0,cup_number,corner_idx,0], gt_kp[0,cup_number,corner_idx,1],
+                    #              'rx', linewidth = 4,markersize = 10)
+                    #     plt.show()
 
-                plt.plot(kpX_topN, kpY_topN, colorcodes[corner_idx] + 'o')
-                plt.show()
-                ######### Only for debug use, plot the gt against estimation
-                # for cup_number in range(gt_kp.shape[1]):
-                #     plt.plot(gt_kp[0,cup_number,corner_idx,0], gt_kp[0,cup_number,corner_idx,1],
-                #              'rx', linewidth = 4,markersize = 10)
-                #     plt.show()
+                    fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_{}_kp{}.png".format(batch_idx,object_name,corner_idx)))
+                    plt.close(fig)
+                    with open(os.path.join(OUTPUT_DIR, "prediction_{}_{}_kp{}.csv".format(batch_idx,object_name,corner_idx)), "wb") as f:
+                        writer = csv.writer(f)
+                        writer.writerows([kpX_topN,kpY_topN])
 
-                fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_kp{}.png".format(batch_idx,corner_idx)))
-                plt.close(fig)
             # if Debug:
             #     np.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout".format(batch_idx)), save_to_npy)
             # vertices_xy = get_bbox_vertices(save_to_npy)
