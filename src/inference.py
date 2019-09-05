@@ -177,6 +177,7 @@ def validate():
 
             a = fig.add_subplot(1, 2, 2)
             predicted_mx = predicted_mask.data.cpu().numpy()
+            predicted_mx_origin = np.copy(predicted_mx)
             predicted_mx = predicted_mx.argmax(axis=0)
             # for display
             predicted_mx[predicted_mx == 1] = 51 * 5
@@ -199,6 +200,9 @@ def validate():
             print("Predicted {}th frame".format(batch_idx))
             plt.close(fig)
 
+            for labels in range(predicted_mx_origin.shape[0]):
+                 label_img = Image.fromarray(np.uint8(predicted_mx_origin[labels,:,:] * 255))
+                 label_img.save(os.path.join(OUTPUT_DIR, "seglabel_{}_{}_.png".format(labels,batch_idx)))
             # processes to save 4d output "combined_map", "img" should be original image
 
             # vertices_xy = get_bbox_vertices(combined_map)
