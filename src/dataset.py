@@ -8,6 +8,7 @@ from PIL import Image
 import glob
 from os.path import exists
 import json
+import cv2
 
 LF_CLASSES = {'background': 0,  # always index 0
                 'wine_cup':2,
@@ -28,6 +29,9 @@ class LFDataset(Dataset):
         self.edgemap = edgemap
         self.root_path = root_path
         self.intriscM = np.matrix([[112, 0.0, 112.0],[0.0, 112, 112.0],[0.0, 0.0, 1.0]])
+        self.random_translation = (25.0, 25.0)
+        self.random_rotation = 15.0
+
         # self.num_kpts = 1 + 1 # 1 center + 1 centroid
         if self.validation:
             self.findallimg_validate(self.root_path)
@@ -318,6 +322,14 @@ class LFDataset(Dataset):
 
     def load_image(self, path=None):
         raw_image = Image.open(path)
+        self.dx = round(np.random.normal(0, 2) * float(self.random_translation[0]))
+        self.dy = round(np.random.normal(0, 2) * float(self.random_translation[1]))
+        self.angle = round(np.random.normal(0, 1) * float(self.random_rotation))
+
+        tm = np.float32([[1, 0, self.dx], [0, 1, self.dy]])
+        rm = cv2.getRotationMatrix2D(
+            (raw_image.size[0]/(self.angular_size*2), raw_image.size[1]/(self.angular_size*2)), self.angle, 1)
+
         try:
             raw_image = np.transpose(raw_image, (2, 0, 1))
             raw_image_3d = np.zeros((raw_image.shape[0], self.angular_size ** 2,
@@ -326,7 +338,10 @@ class LFDataset(Dataset):
             for k in range(3):  # divide r, g, b channels
                 for i in range(self.angular_size):
                     for j in range(self.angular_size):
-                        raw_image_3d[k, i * self.angular_size + j] = raw_image[k, i::5, j::5]
+                        temp_img = np.array(raw_image[k, i::5, j::5])
+                        image_r = cv2.warpAffine(temp_img, rm, temp_img.shape)
+                        result = cv2.warpAffine(image_r, tm, temp_img.shape)
+                        raw_image_3d[k, i * self.angular_size + j] = result
 
         except:
             os.remove(path)
@@ -343,6 +358,12 @@ class LFDataset(Dataset):
         imx_t = np.array(raw_image)
         # border
         imx_t[imx_t == 255] = 1
+        tm = np.float32([[1, 0, self.dx], [0, 1, self.dy]])
+        rm = cv2.getRotationMatrix2D(
+            (imx_t.shape[0] / (self.angular_size * 2), imx_t.shape[1] / (self.angular_size * 2)), self.angle, 1)
+        imx_t = cv2.warpAffine(imx_t, rm, imx_t.shape)
+        imx_t = cv2.warpAffine(imx_t, tm, imx_t.shape)
+
 
         return imx_t
 
