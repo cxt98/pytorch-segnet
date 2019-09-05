@@ -137,7 +137,7 @@ def validate():
                     kpX = np.ma.compress_cols(kpX)
                     kpY = np.ma.compress_cols(kpY)
                     kpC = np.ma.compress_cols(kpC)
-                    topN = 50
+                    topN = 100
                     kp = np.hstack((np.transpose(kpX), np.transpose(kpY), np.transpose(kpC)))
                     kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)[:topN]
                     # kp_topN = sorted(kp, key=lambda entry: entry[-1], reverse=True)

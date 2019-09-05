@@ -44,8 +44,9 @@ class LFDataset(Dataset):
         return len(self.images)
 
     def __getitem__(self, index):
-        image = self.load_image(path=self.images[index])
+
         if not self.validation:
+            image = self.load_image_test(path=self.images[index])
             gt_mask = self.load_mask(path=self.masks[index])
             json_info = self.loadjson(path=self.jsonfile[index])
             gt_offset, depth_mask = self.generate_offset_map(jsoninfo=json_info, mask=gt_mask, simplfied=False)
@@ -56,6 +57,7 @@ class LFDataset(Dataset):
                 'depth_mask': torch.FloatTensor(depth_mask)
             }
         else:
+            image = self.load_image_test(path=self.images[index])
             # kpts_3d = []
             # json_info = self.loadjson(path=self.jsonfile[index]) # debug agasint gt key points
             # for i in range(len(json_info['keypoints_3d'])):
@@ -351,6 +353,27 @@ class LFDataset(Dataset):
         # imx_t = np.array(raw_image, dtype=np.float32) / 255.0
         return imx_t
 
+    def load_image_test(self, path=None):
+        raw_image = Image.open(path)
+
+        try:
+            raw_image = np.transpose(raw_image, (2, 0, 1))
+            raw_image_3d = np.zeros((raw_image.shape[0], self.angular_size ** 2,
+                                     raw_image.shape[1] / self.angular_size,
+                                     raw_image.shape[2] / self.angular_size))
+            for k in range(3):  # divide r, g, b channels
+                for i in range(self.angular_size):
+                    for j in range(self.angular_size):
+                        raw_image_3d[k, i * self.angular_size + j] = np.array(raw_image[k, i::5, j::5])
+
+        except:
+            os.remove(path)
+            self.combine_img(path)
+            print(path)
+        imx_t = np.array(raw_image_3d, dtype=np.float32) / 255.0
+        # imx_t = np.array(raw_image, dtype=np.float32) / 255.0
+        return imx_t
+
     def load_mask(self, path=None):
         raw_image = Image.open(path)  # .convert('RGB')
         # raw_image = np.transpose(raw_image, (2, 1, 0))
@@ -358,11 +381,11 @@ class LFDataset(Dataset):
         imx_t = np.array(raw_image)
         # border
         imx_t[imx_t == 255] = 1
-        tm = np.float32([[1, 0, self.dx], [0, 1, self.dy]])
-        rm = cv2.getRotationMatrix2D(
-            (imx_t.shape[0] / (self.angular_size * 2), imx_t.shape[1] / (self.angular_size * 2)), self.angle, 1)
-        imx_t = cv2.warpAffine(imx_t, rm, imx_t.shape)
-        imx_t = cv2.warpAffine(imx_t, tm, imx_t.shape)
+        # tm = np.float32([[1, 0, self.dx], [0, 1, self.dy]])
+        # rm = cv2.getRotationMatrix2D(
+        #     (imx_t.shape[0] / (self.angular_size * 2), imx_t.shape[1] / (self.angular_size * 2)), self.angle, 1)
+        # imx_t = cv2.warpAffine(imx_t, rm, imx_t.shape)
+        # imx_t = cv2.warpAffine(imx_t, tm, imx_t.shape)
 
 
         return imx_t
