@@ -364,23 +364,9 @@ class LFDataset(Dataset):
 
     def load_image_test(self, path=None):
         raw_image = Image.open(path)
+        raw_image = np.transpose(raw_image, (2, 1, 0))
+        imx_t = np.array(raw_image, dtype=np.float32) / 255.0
 
-        try:
-            raw_image = np.transpose(raw_image, (2, 0, 1))
-            raw_image_3d = np.zeros((raw_image.shape[0], self.angular_size ** 2,
-                                     raw_image.shape[1] / self.angular_size,
-                                     raw_image.shape[2] / self.angular_size))
-            for k in range(3):  # divide r, g, b channels
-                for i in range(self.angular_size):
-                    for j in range(self.angular_size):
-                        raw_image_3d[k, i * self.angular_size + j] = np.array(raw_image[k, i::5, j::5])
-
-        except:
-            os.remove(path)
-            self.combine_img(path)
-            print(path)
-        imx_t = np.array(raw_image_3d, dtype=np.float32) / 255.0
-        # imx_t = np.array(raw_image, dtype=np.float32) / 255.0
         return imx_t
 
     def load_mask(self, path=None):

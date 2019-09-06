@@ -54,38 +54,38 @@ class SegNet(nn.Module):
 
         # add angular filter layers specific for 3D light field image inputs before feature extraction
 
-        self.angular_conv = nn.Sequential(*[
-            nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=64,
-                      kernel_size=(self.angular_size ** 2, 1, 1),
-                      stride=(self.angular_size ** 2, 1, 1),
-                      padding=(0, 0, 0)),
-            nn.BatchNorm3d(64)
-        ])
-
-        self.EPI_row = nn.Sequential(*[
-            nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=64,
-                      kernel_size=(self.angular_size, 3, 3),
-                      stride=(self.angular_size, 1, 1),
-                      padding=(0, 1, 1)),
-            nn.BatchNorm3d(64)
-        ])
-
-
-        self.EPI_col = nn.Sequential(*[
-            nn.Conv3d(in_channels=self.input_channels,
-                      out_channels=64,
-                      kernel_size=(self.angular_size, 3, 3),
-                      stride=(1, 1, 1),
-                      dilation=(self.angular_size, 1, 1),
-                      padding=(0, 1, 1)),
-            nn.BatchNorm3d(64)
-        ])
+        # self.angular_conv = nn.Sequential(*[
+        #     nn.Conv3d(in_channels=self.input_channels,
+        #               out_channels=64,
+        #               kernel_size=(self.angular_size ** 2, 1, 1),
+        #               stride=(self.angular_size ** 2, 1, 1),
+        #               padding=(0, 0, 0)),
+        #     nn.BatchNorm3d(64)
+        # ])
+        #
+        # self.EPI_row = nn.Sequential(*[
+        #     nn.Conv3d(in_channels=self.input_channels,
+        #               out_channels=64,
+        #               kernel_size=(self.angular_size, 3, 3),
+        #               stride=(self.angular_size, 1, 1),
+        #               padding=(0, 1, 1)),
+        #     nn.BatchNorm3d(64)
+        # ])
+        #
+        #
+        # self.EPI_col = nn.Sequential(*[
+        #     nn.Conv3d(in_channels=self.input_channels,
+        #               out_channels=64,
+        #               kernel_size=(self.angular_size, 3, 3),
+        #               stride=(1, 1, 1),
+        #               dilation=(self.angular_size, 1, 1),
+        #               padding=(0, 1, 1)),
+        #     nn.BatchNorm3d(64)
+        # ])
 
 
         self.encoder_conv_00 = nn.Sequential(*[
-            nn.Conv2d(in_channels=64 * (2 * self.angular_size + 1),
+            nn.Conv2d(in_channels=self.input_channels,
                       out_channels=64,
                       kernel_size=3,
                       padding=1),
@@ -445,22 +445,22 @@ class SegNet(nn.Module):
         """
 
         # Encoder - angular filter layer
-        dim_ang = input_img.size()
-        x_ang0 = self.angular_conv(input_img)
-        x_EPI_row = self.EPI_row(input_img)
-        x_EPI_col = self.EPI_col(input_img)
-
-        concatenate_feature = torch.cat((x_ang0, x_EPI_row, x_EPI_col), dim=2)
-        x_concat = F.relu(concatenate_feature)
-
-        x_concat = x_concat.view(x_concat.shape[0], x_concat.shape[1] * x_concat.shape[2], x_concat.shape[3],
-                                 x_concat.shape[4])
-        # Encoder Stage - 1
+        # dim_ang = input_img.size()
+        # x_ang0 = self.angular_conv(input_img)
+        # x_EPI_row = self.EPI_row(input_img)
+        # x_EPI_col = self.EPI_col(input_img)
+        #
+        # concatenate_feature = torch.cat((x_ang0, x_EPI_row, x_EPI_col), dim=2)
+        # x_concat = F.relu(concatenate_feature)
+        #
+        # x_concat = x_concat.view(x_concat.shape[0], x_concat.shape[1] * x_concat.shape[2], x_concat.shape[3],
+        #                          x_concat.shape[4])
+        # # Encoder Stage - 1
         # dim_0 = [input_img.size()[0]/5, input_img.size()[1]/5]
         dim_0 = input_img.size()
-        dim_0 = torch.Size([dim_0[0], dim_0[1], dim_0[3], dim_0[4]])
+        # dim_0 = torch.Size([dim_0[0], dim_0[1], dim_0[3], dim_0[4]])
 
-        x_00 = F.relu(self.encoder_conv_00(x_concat))
+        x_00 = F.relu(self.encoder_conv_00(input_img))
         x_01 = F.relu(self.encoder_conv_01(x_00))
         x_0, indices_0 = F.max_pool2d(x_01, kernel_size=2, stride=2, return_indices=True)
 
@@ -570,7 +570,7 @@ class SegNet(nn.Module):
         xkey_output[:, 2*self.keypoints:] = torch.sigmoid(xkey_output[:, 2*self.keypoints:])  # for additional depth regression channel, also use sigmoid
 
         if DEBUG:
-            print("dim_ang: {}".format(dim_ang))
+            # print("dim_ang: {}".format(dim_ang))
             print("dim_0: {}".format(dim_0))
             print("dim_1: {}".format(dim_1))
             print("dim_2: {}".format(dim_2))
