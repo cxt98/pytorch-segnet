@@ -64,6 +64,7 @@ class LFDataset(Dataset):
             #     kpts_3d.append(self.get_3d_3pts(json_info['keypoints_3d'][i]))
             data = {
                 'image': torch.FloatTensor(image),
+                'image_path': self.images[index]
                 # 'keypoints_2d': torch.FloatTensor(json_info['keypoints_2d']) # debug agasint gt key points
                 # 'keypoints_2d': torch.FloatTensor(kpts_3d)
             }

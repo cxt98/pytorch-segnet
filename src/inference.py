@@ -42,6 +42,11 @@ NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1
 NUM_KEYPOINTS = 1  # center only
 BATCH_SIZE = 1
 
+img_dic = {0:'bg',
+           1: 'edge',
+           2: 'wine_cup',
+           3: 'tall_cup'}
+
 # Arguments
 parser = argparse.ArgumentParser(description='Validate a SegNet model')
 
@@ -90,7 +95,8 @@ def validate():
 
     for batch_idx, batch in enumerate(val_dataloader):
         input_tensor = torch.autograd.Variable(batch['image'])
-
+        current_imgpath = batch['image_path']
+        current_imgpath = current_imgpath[0][-14:-6]
         # gt_kp = batch['keypoints_2d'].data.cpu().numpy() ########### Only for debug use, plot the gt against estimation
 
         xseg_output, key_depth_tensor = model(input_tensor)
@@ -152,9 +158,9 @@ def validate():
                     #              'rx', linewidth = 4,markersize = 10)
                     #     plt.show()
 
-                    fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_{}_kp{}.png".format(batch_idx,object_name,corner_idx)))
+                    fig.savefig(os.path.join(OUTPUT_DIR, "{}_{}_kp{}.png".format(current_imgpath,object_name,corner_idx)))
                     plt.close(fig)
-                    with open(os.path.join(OUTPUT_DIR, "prediction_{}_{}_kp{}.csv".format(batch_idx,object_name,corner_idx)), "wb") as f:
+                    with open(os.path.join(OUTPUT_DIR, "{}_{}_kp{}.csv".format(current_imgpath,object_name,corner_idx)), "wb") as f:
                         writer = csv.writer(f)
                         writer.writerows([kpX_topN,kpY_topN])
 
@@ -195,14 +201,14 @@ def validate():
             # plt.imshow(target_mx)
             # a.set_title('Ground Truth')
 
-            fig.savefig(os.path.join(OUTPUT_DIR, "prediction_{}_segout.png".format(batch_idx)))
-            single_mask.save(os.path.join(OUTPUT_DIR, "prediction_{}_segout_single.png".format(batch_idx)))
+            # fig.savefig(os.path.join(OUTPUT_DIR, "{}_segout.png".format(current_imgpath)))
+            # single_mask.save(os.path.join(OUTPUT_DIR, "{}_segout_single.png".format(current_imgpath)))
             print("Predicted {}th frame".format(batch_idx))
             plt.close(fig)
 
             for labels in range(predicted_mx_origin.shape[0]):
                  label_img = Image.fromarray(np.uint8(predicted_mx_origin[labels,:,:] * 255))
-                 label_img.save(os.path.join(OUTPUT_DIR, "seglabel_{}_{}_.png".format(labels,batch_idx)))
+                 label_img.save(os.path.join(OUTPUT_DIR, "{}_seglabel_{}.png".format(current_imgpath,img_dic[labels])))
             # processes to save 4d output "combined_map", "img" should be original image
 
             # vertices_xy = get_bbox_vertices(combined_map)
