@@ -42,11 +42,13 @@ NUM_OUTPUT_CHANNELS = NUM_CLASSES + 1
 NUM_KEYPOINTS = 1  # center only
 BATCH_SIZE = 1
 
+# img_dic = {0:'bg',
+#            1: 'edge',
+#            2: 'wine_cup',
+#            3: 'tall_cup'}
 img_dic = {0:'bg',
            1: 'edge',
-           2: 'wine_cup',
-           3: 'tall_cup'}
-
+           2: 'glass'}
 # Arguments
 parser = argparse.ArgumentParser(description='Validate a SegNet model')
 

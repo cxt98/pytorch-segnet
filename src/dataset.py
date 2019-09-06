@@ -11,8 +11,10 @@ import json
 import cv2
 
 LF_CLASSES = {'background': 0,  # always index 0
-                'wine_cup':2,
-              'tall_cup': 3}
+                'glass':2} # mark both as glass !
+
+LF_CLASSES_GLASS = {'background': 0,  # always index 0
+                'wine_cup':2,'tall_cup':2, 'glass_jar':2} # mark both as glass !
 
 NUM_CLASSES = len(LF_CLASSES)
 
@@ -166,7 +168,13 @@ class LFDataset(Dataset):
                 keypoint2d = self.get_3d_3pts(jsoninfo['keypoints_3d'][idx])
             else:
                 keypoint2d = jsoninfo['keypoints_2d'][idx]
-            target_label = LF_CLASSES[class_name]
+
+            # For glass training
+
+            target_label = LF_CLASSES_GLASS[class_name]
+
+            # For glass training
+
             current_instance_mask = np.full(img_size, False)
             bbox_rowindex = (self.boundary_check(bbox[0][1], 0, img_size[0]),
                              self.boundary_check(bbox[2][1], 0, img_size[0]))
