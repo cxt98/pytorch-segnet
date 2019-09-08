@@ -38,7 +38,7 @@ NUM_KEYPOINTS = 1  # 1 center
 NUM_EPOCHS = 100
 
 LEARNING_RATE = 1e-3
-BATCH_SIZE = 12
+BATCH_SIZE = 8
 
 
 # Arguments
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     data_root = args.data_root
 
     CUDA = 1 # args.gpu is not None
-    GPU_ID = [0,1]
+    GPU_ID = [0]
 
     if args.edgemap:
         edgemap = True

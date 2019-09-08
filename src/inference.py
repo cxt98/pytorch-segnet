@@ -98,7 +98,8 @@ def validate():
     for batch_idx, batch in enumerate(val_dataloader):
         input_tensor = torch.autograd.Variable(batch['image'])
         current_imgpath = batch['image_path']
-        current_imgpath = current_imgpath[0][-14:-6]
+        current_imgpath = current_imgpath[0][-20:-6]
+        print(current_imgpath)
         # gt_kp = batch['keypoints_2d'].data.cpu().numpy() ########### Only for debug use, plot the gt against estimation
 
         xseg_output, key_depth_tensor = model(input_tensor)
@@ -129,7 +130,7 @@ def validate():
                         continue
                     targetLabel = LF_CLASSES[object_name]
                     fig = plt.figure()
-                    plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))
+                    plt.imshow(input_image.transpose(0, 2).transpose(0, 1))
                     kpX = predicted_kpX[corner_idx, seg_mask == targetLabel]
                     kpY = predicted_kpY[corner_idx, seg_mask == targetLabel]
                     kpC = predicted_conf[corner_idx, seg_mask == targetLabel]
@@ -180,7 +181,7 @@ def validate():
             fig = plt.figure()
 
             a = fig.add_subplot(1, 2, 1)
-            plt.imshow(input_image[:, 13].transpose(0, 2).transpose(0, 1))  # extract CenterView from 3D LF input
+            plt.imshow(input_image.transpose(0, 2).transpose(0, 1))  # extract CenterView from 3D LF input
             a.set_title('Input Image')
 
             a = fig.add_subplot(1, 2, 2)
@@ -362,7 +363,7 @@ if __name__ == "__main__":
     OUTPUT_DIR = args.output_dir
 
     CUDA = 1
-    GPU_ID = [0, 1]
+    GPU_ID = [0]
 
     val_dataset = LFDataset(root_path=data_root, validation=True)
 

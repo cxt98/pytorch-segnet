@@ -267,7 +267,7 @@ class LFDataset(Dataset):
             for path_entry in folders:
                 self.findallimg_validate(path_entry)
         else:
-            for imgpath in sorted(glob.glob(path + '/*LF.jpg')):
+            for imgpath in sorted(glob.glob(path + '/*lf.png')):
                 self.images.append(imgpath)
                 # jsonpath = imgpath.replace("lf.png", "json") # debug agasint gt key points
                 # self.jsonfile.append(jsonpath) # debug agasint gt key points
